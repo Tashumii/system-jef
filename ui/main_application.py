@@ -1,383 +1,174 @@
-"""
-Main application window using Inheritance pattern.
-MainApplication inherits from tk.Tk for the root window with modern design and analytics.
-"""
-
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
-from collections import defaultdict
-import datetime
-import json
-
-# Import matplotlib with fallback
-try:
-    import matplotlib.pyplot as plt
-    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-    MATPLOTLIB_AVAILABLE = True
-except ImportError:
-    MATPLOTLIB_AVAILABLE = False
-    print("Warning: Matplotlib not available. Charts will not be displayed.")
+from tkinter import ttk, messagebox
 
 from database.interfaces import IDataManager
 from config.settings import APP_CONFIG
-from ui.game_form import GameForm
-from ui.game_list import GameList
+from ui.game_list import GameList  # make sure this is the cleaned version
 
 
 class MainApplication(tk.Tk):
     """
-    Main Application Window.
-    Theme: Casual Cyan-Green (Eco-Modern)
+    Midnight Teal Themed Sidebar Application
+    Fully fixed version with .run() method
     """
 
     def __init__(self, data_manager: IDataManager):
         super().__init__()
 
         self.data_manager = data_manager
-        self.current_user = None
+        self.current_view = None
+        self.current_user = {"username": "Admin"}  # temporary
 
-        self.withdraw()
-        self.show_login()
+        self.withdraw()  # Hide flashing
+        self._setup_window()
+        self._setup_styles()
+        self._build_layout()
+        self._build_sidebar()
 
-    def show_login(self):
-        """Display the login window for user authentication."""
-        from ui.auth import LoginWindow
+        self.show_view("dashboard")
 
-        def on_login_success(user_data):
-            self.current_user = user_data
-            self.initialize_main_app()
+        self.deiconify()  # Show app without flicker
 
-        LoginWindow(self, self.data_manager, on_login_success)
+    # -------------------------
+    # WINDOW + THEME SETUP
+    # -------------------------
+    def _setup_window(self):
+        self.title(APP_CONFIG.get("title", "Sports Management Dashboard"))
+        self.geometry(APP_CONFIG.get("geometry", "1280x800"))
+        self.configure(bg="#1e1e1e")
 
-    def initialize_main_app(self):
-        """Initialize the main application after successful login."""
-        self.title(f"{APP_CONFIG['title']} - {self.current_user['username']}")
-        self.geometry("1300x850")  # Consistent casual size
-        self.resizable(True, True)
+    def _setup_styles(self):
+        style = ttk.Style()
+        style.theme_use("clam")
 
-        # Apply Theme
-        self._setup_theme()
+        bg = "#1e1e1e"
+        fg = "#ffffff"
+        accent = "#00acc1"
 
-        # Create Menu Bar
-        self.create_menu()
+        style.configure("TFrame", background=bg)
+        style.configure("TLabel", background=bg, foreground=fg)
+        style.configure("Header.TLabel",
+                        font=("Segoe UI", 24, "bold"),
+                        foreground=accent)
 
-        # Status Bar
-        self.status_var = tk.StringVar()
-        self.status_var.set(f"Ready • {datetime.datetime.now().strftime('%B %d, %Y')}")
+        # Treeview table styling
+        style.configure("Treeview",
+                        background="#2d2d2d",
+                        fieldbackground="#2d2d2d",
+                        foreground="white",
+                        rowheight=30)
+        style.configure("Treeview.Heading",
+                        background="#333333",
+                        foreground=accent,
+                        font=("Segoe UI", 10, "bold"))
+        style.map("Treeview", background=[("selected", accent)])
 
-        self.setup_ui()
-        self.deiconify()
+    # -------------------------
+    # LAYOUT
+    # -------------------------
+    def _build_layout(self):
+        # Sidebar (left)
+        self.sidebar = tk.Frame(self, bg="#252526", width=250)
+        self.sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        self.sidebar.pack_propagate(False)
 
-    def _setup_theme(self):
-        """Setup the Casual Cyan-Green Theme (Eco-Modern)."""
-        self.style = ttk.Style()
+        # Main content (right)
+        self.content_area = tk.Frame(self, bg="#1e1e1e")
+        self.content_area.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
-        # --- Palette Definition ---
-        BG_MAIN = '#182421'      # Deep Slate Green
-        BG_CARD = '#23332e'      # Lighter Slate Green for cards
-        FG_TEXT = '#e8f5e9'      # Soft White/Mint
-        ACCENT  = '#26a69a'      # Teal/Cyan-Green
-        ACTIVE  = '#00897b'      # Darker Teal for active states
-        FONT_MAIN = ('Segoe UI', 10)
-        FONT_HEAD = ('Segoe UI', 16, 'bold')
+    def _build_sidebar(self):
+        tk.Label(
+            self.sidebar,
+            text="🏅 SPORTIFY",
+            bg="#252526",
+            fg="#00acc1",
+            font=("Segoe UI", 20, "bold")
+        ).pack(pady=40)
 
-        self.configure(bg=BG_MAIN)
-        self.style.theme_use('clam')
+        self._add_nav_button("📊  Dashboard", "dashboard")
+        self._add_nav_button("📝  New Entry", "entry")
+        self._add_nav_button("📁  Records", "records")
+        self._add_nav_button("⚔️  Head-to-Head", "h2h")
 
-        # Frames and Labels
-        self.style.configure('TFrame', background=BG_MAIN)
-        self.style.configure('TLabel', background=BG_MAIN, foreground=FG_TEXT, font=FONT_MAIN)
+        tk.Button(
+            self.sidebar,
+            text="⚙ Settings",
+            bg="#252526",
+            fg="#aaaaaa",
+            bd=0,
+            cursor="hand2",
+            activebackground="#252526"
+        ).pack(side=tk.BOTTOM, pady=20)
 
-        # Cards
-        self.style.configure('Card.TFrame', background=BG_CARD, relief='flat', borderwidth=0)
+    def _add_nav_button(self, text: str, target: str):
+        btn = tk.Button(
+            self.sidebar,
+            text=text,
+            bg="#252526",
+            fg="white",
+            bd=0,
+            font=("Segoe UI", 11),
+            anchor="w",
+            padx=30,
+            pady=12,
+            activebackground="#333333",
+            activeforeground="#00acc1",
+            cursor="hand2",
+            command=lambda: self.show_view(target)
+        )
+        btn.pack(fill=tk.X)
 
-        # Headers
-        self.style.configure('Header.TLabel', font=FONT_HEAD, foreground=ACCENT, background=BG_CARD)
-        self.style.configure('Stats.TLabel', font=('Segoe UI', 12, 'bold'), foreground='#66bb6a', background=BG_CARD)
+    # -------------------------
+    # VIEW SWITCHING SYSTEM
+    # -------------------------
+    def show_view(self, view_name: str):
+        """Safely load any view while preventing crashes."""
+        # Clear existing view
+        for widget in self.content_area.winfo_children():
+            widget.destroy()
 
-        # Buttons
-        self.style.configure('TButton', font=('Segoe UI', 10, 'bold'), background=ACCENT, foreground='white',
-                             borderwidth=0, focuscolor=BG_CARD, padding=(15, 8))
-        self.style.map('TButton', background=[('active', ACTIVE), ('pressed', '#004d40')])
-
-        # Notebook (Tabs)
-        self.style.configure('TNotebook', background=BG_MAIN, borderwidth=0)
-        self.style.configure('TNotebook.Tab', background=BG_MAIN, foreground='#b0bec5', padding=(20, 12), font=('Segoe UI', 11))
-        self.style.map('TNotebook.Tab', background=[('selected', BG_CARD)], foreground=[('selected', ACCENT)])
-
-        # Inputs
-        self.style.configure('TEntry', fieldbackground='#2c3e39', foreground='white', insertcolor='white', borderwidth=0, padding=5)
-        self.style.map('TEntry', fieldbackground=[('focus', '#2c3e39')])
-
-        self.style.configure('TCombobox', fieldbackground='#2c3e39', background=ACCENT, foreground='white', arrowcolor='white', borderwidth=0, padding=5)
-        self.style.map('TCombobox', fieldbackground=[('readonly', '#2c3e39')])
-
-        # Scrollbars
-        self.style.configure('TScrollbar', background=BG_CARD, troughcolor=BG_MAIN, borderwidth=0, arrowcolor=ACCENT)
-        self.style.map('TScrollbar', background=[('active', ACCENT)])
-
-    def create_menu(self):
-        """Create top system menu with custom green styling."""
-        # Menu colors need to be set on the widget itself, ttk doesn't control native menus easily
-        menubar = tk.Menu(self, bg='#23332e', fg='#e8f5e9', activebackground='#26a69a', activeforeground='white', relief='flat')
-
-        file_menu = tk.Menu(menubar, tearoff=0, bg='#23332e', fg='#e8f5e9', activebackground='#26a69a', activeforeground='white')
-        file_menu.add_command(label="💾  Backup Database", command=self.backup_data)
-        file_menu.add_separator()
-        file_menu.add_command(label="🚪  Logout", command=self.quit_app)
-        file_menu.add_command(label="❌  Exit", command=self.quit)
-        menubar.add_cascade(label="  File  ", menu=file_menu)
-
-        tools_menu = tk.Menu(menubar, tearoff=0, bg='#23332e', fg='#e8f5e9', activebackground='#26a69a', activeforeground='white')
-        tools_menu.add_command(label="🔄  Refresh All", command=self.refresh_all)
-        menubar.add_cascade(label="  Tools  ", menu=tools_menu)
-
-        self.config(menu=menubar)
-
-    def backup_data(self):
-        """Backup all games to a JSON file."""
         try:
-            games = self.data_manager.fetch_games()
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
-            filename = filedialog.asksaveasfilename(
-                defaultextension=".json",
-                initialfile=f"backup_{timestamp}.json",
-                filetypes=[("JSON Files", "*.json")],
-                title="Save Backup"
-            )
+            if view_name == "dashboard":
+                from ui.analytics_dashboard import AnalyticsDashboard
+                view = AnalyticsDashboard(self.content_area, self.data_manager)
 
-            if filename:
-                serializable_games = []
-                for g in games:
-                    g_copy = g.copy()
-                    if isinstance(g_copy.get('date'), (datetime.date, datetime.datetime)):
-                        g_copy['date'] = str(g_copy['date'])
-                    # Cleanup keys
-                    for k in ['created_at', 'updated_at']:
-                        if k in g_copy: del g_copy[k]
-                    serializable_games.append(g_copy)
+            elif view_name == "records":
+                from ui.game_list import GameList
+                view = GameList(self.content_area, self.data_manager)
+                view.refresh_games()  # ensure latest games are fetched
 
-                with open(filename, 'w') as f:
-                    json.dump({"data": serializable_games, "meta": {"exported_at": timestamp}}, f, indent=4)
+            elif view_name == "entry":
+                from ui.game_form import GameForm
+                # Pass GameList instance to GameForm for auto-refresh
+                from ui.game_list import GameList
+                records_view = GameList(self.content_area, self.data_manager)
+                records_view.refresh_games()
+                view = GameForm(
+                    self.content_area,
+                    self.data_manager,
+                    game_list=records_view  # ✅ pass the instance
+                )
 
-                messagebox.showinfo("Backup Successful", f"Saved {len(games)} records.")
+            elif view_name == "h2h":
+                from ui.head_to_head import HeadToHeadView
+                view = HeadToHeadView(self.content_area, self.data_manager)
+
+            else:
+                raise Exception(f"Unknown view: {view_name}")
+
+            view.pack(fill=tk.BOTH, expand=True, padx=30, pady=30)
+            self.current_view = view  # track current view
+
         except Exception as e:
-            messagebox.showerror("Backup Failed", f"Error: {str(e)}")
+            messagebox.showerror(
+                "View Load Error", f"Failed to load view '{view_name}':\n\n{str(e)}")
+    # -------------------------
+    # ADD RUN() METHOD
+    # -------------------------
 
-    def setup_ui(self):
-        """Set up the main UI components."""
-        self.notebook = ttk.Notebook(self)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
-
-        # Components
-        self.game_list = GameList(self.notebook, self.data_manager)
-        self.game_form = GameForm(self.notebook, self.data_manager, self.game_list)
-        self.analytics_dashboard = AnalyticsDashboard(self.notebook, self.data_manager)
-
-        # Tabs with spacing
-        self.notebook.add(self.game_form, text="  ➕ New Entry  ")
-        self.notebook.add(self.game_list, text="  📋 Records  ")
-        self.notebook.add(self.analytics_dashboard, text="  📊 Insights  ")
-
-        self.create_status_bar()
-
-        # Load initial data
-        self.refresh_all()
-
-        # Bind refresh events
-        self.bind('<F5>', lambda e: self.refresh_all())
-        self.bind('<Control-r>', lambda e: self.refresh_all())
-        self.bind('<Control-q>', lambda e: self.quit_app())
-        self.bind('<F1>', lambda e: self.show_help())
-
-    def refresh_all(self):
-        self.game_list.refresh_games()
-        self.analytics_dashboard.refresh_analytics()
-
-    def quit_app(self):
-        if messagebox.askyesno("Exit", "Are you sure you want to exit?"):
-            self.destroy()
-
-    def create_status_bar(self):
-        """Create modern status bar."""
-        status_frame = ttk.Frame(self, style='Card.TFrame')
-        status_frame.pack(fill=tk.X, side=tk.BOTTOM)
-
-        # Status label
-        ttk.Label(status_frame, textvariable=self.status_var,
-                  foreground='#80cbc4', font=('Segoe UI', 9), background='#23332e').pack(side=tk.LEFT, padx=15, pady=8)
-
-        # Database status
-        ttk.Label(status_frame, text="Connected to Database",
-                  foreground='#80cbc4', font=('Segoe UI', 9), background='#23332e').pack(side=tk.RIGHT, padx=15, pady=8)
-
-    def show_help(self):
-        """Show keyboard shortcuts."""
-        help_text = """
-🎯 Shortcuts:
-• F5 / Ctrl+R : Refresh Data
-• Ctrl+Q : Exit
-• Ctrl+S : Save (in form)
-        """
-        messagebox.showinfo("Help", help_text)
-
-
-class AnalyticsDashboard(ttk.Frame):
-    """
-    Analytics Dashboard Widget.
-    Theme: Casual Cyan-Green
-    """
-
-    def __init__(self, parent, data_manager: IDataManager):
-        super().__init__(parent, style='Card.TFrame')
-        self.data_manager = data_manager
-        self.stats_labels = {}
-        self.setup_dashboard()
-
-    def setup_dashboard(self):
-        # Header
+    def run(self):
+        """Start Tkinter main loop safely."""
         try:
-            header = ttk.Label(self, text="Performance Overview", style='Header.TLabel')
-        except:
-            header = tk.Label(self, text="Performance Overview", fg='#26a69a', bg='#23332e', font=('Segoe UI', 16, 'bold'))
-        header.pack(pady=(25, 20))
-
-        # Stats container
-        stats_frame = ttk.Frame(self, style='Card.TFrame')
-        stats_frame.pack(fill=tk.X, padx=30, pady=10)
-
-        self.create_stats_cards(stats_frame)
-
-        # Charts container
-        charts_frame = ttk.Frame(self, style='Card.TFrame')
-        charts_frame.pack(fill=tk.BOTH, expand=True, padx=30, pady=20)
-
-        self.create_charts(charts_frame)
-        self.sports_canvas = None
-        self.trends_canvas = None
-
-        # Refresh button
-        ttk.Button(self, text="Refresh Data", command=self.refresh_analytics).pack(pady=10)
-
-    def create_stats_cards(self, parent):
-        """Create casual statistics cards."""
-        metrics = [
-            ("Total Games", "total_games", "#26a69a"),
-            ("Active Teams", "active_teams", "#66bb6a"),
-            ("Win Rate", "win_rate", "#29b6f6"),
-            ("Avg Score", "avg_goals", "#ffa726")
-        ]
-
-        for i in range(4): parent.columnconfigure(i, weight=1)
-
-        for col, (title, key, color) in enumerate(metrics):
-            # Card styling using standard Frame for background control
-            card = tk.Frame(parent, bg='#2c3e39', padx=20, pady=15)
-            card.grid(row=0, column=col, padx=10, sticky='ew')
-
-            # Value
-            val = tk.Label(card, text="0", font=('Segoe UI', 26, 'bold'), fg=color, bg='#2c3e39')
-            val.pack()
-            self.stats_labels[key] = val
-
-            # Title
-            tk.Label(card, text=title, font=('Segoe UI', 10), fg='#b0bec5', bg='#2c3e39').pack()
-
-    def create_charts(self, parent):
-        # Left and Right frames for charts
-        self.sports_frame = tk.Frame(parent, bg='#23332e')
-        self.sports_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
-
-        self.trends_frame = tk.Frame(parent, bg='#23332e')
-        self.trends_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(10, 0))
-
-    def refresh_analytics(self):
-        try:
-            games = self.data_manager.fetch_games() or []
-            self.update_stats(games)
-            self.update_charts(games)
+            self.mainloop()
         except Exception as e:
-            print(f"Analytics error: {e}")
-
-    def update_stats(self, games):
-        if not games: return
-
-        total = len(games)
-        teams = set()
-        goals = 0
-        valid_scores = 0
-
-        for g in games:
-            teams.add(g['team1'])
-            teams.add(g['team2'])
-            try:
-                s1, s2 = map(int, g['score'].split('-'))
-                goals += (s1 + s2)
-                valid_scores += 1
-            except: pass
-
-        avg = f"{(goals/valid_scores):.1f}" if valid_scores else "0.0"
-
-        self.stats_labels['total_games'].config(text=str(total))
-        self.stats_labels['active_teams'].config(text=str(len(teams)))
-        self.stats_labels['win_rate'].config(text="100%") # Placeholder
-        self.stats_labels['avg_goals'].config(text=avg)
-
-    def update_charts(self, games):
-        # Clear old charts
-        if self.sports_canvas:
-            self.sports_canvas.get_tk_widget().destroy()
-            plt.close(self.sports_canvas.figure)
-        if self.trends_canvas:
-            self.trends_canvas.get_tk_widget().destroy()
-            plt.close(self.trends_canvas.figure)
-
-        if not games or not MATPLOTLIB_AVAILABLE: return
-
-        # Theme Colors
-        colors = ['#26a69a', '#66bb6a', '#29b6f6', '#ffa726', '#ef5350', '#ab47bc']
-        bg_color = '#23332e'
-        text_color = '#e8f5e9'
-
-        # 1. Pie Chart
-        counts = defaultdict(int)
-        for g in games: counts[g['sport']] += 1
-
-        fig1, ax1 = plt.subplots(figsize=(5, 4), facecolor=bg_color)
-        ax1.pie(counts.values(), labels=counts.keys(), colors=colors, autopct='%1.1f%%',
-                textprops={'color': text_color})
-        ax1.set_title('Games by Sport', color=text_color)
-
-        self.sports_canvas = FigureCanvasTkAgg(fig1, self.sports_frame)
-        self.sports_canvas.draw()
-        self.sports_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-
-        # 2. Bar Chart
-        dates = defaultdict(int)
-        for g in games:
-            try:
-                d = g['date']
-                if isinstance(d, str): d = datetime.datetime.strptime(d, '%Y-%m-%d')
-                dates[d.strftime('%Y-%m')] += 1
-            except: pass
-
-        if dates:
-            s_dates = sorted(dates.items())
-            ks, vs = zip(*s_dates)
-
-            fig2, ax2 = plt.subplots(figsize=(5, 4), facecolor=bg_color)
-            ax2.set_facecolor(bg_color)
-            ax2.bar(ks, vs, color=colors[0])
-            ax2.set_title('Monthly Activity', color=text_color)
-            ax2.tick_params(colors=text_color)
-            ax2.spines['bottom'].set_color(text_color)
-            ax2.spines['left'].set_color(text_color)
-            ax2.spines['top'].set_visible(False)
-            ax2.spines['right'].set_visible(False)
-
-            self.trends_canvas = FigureCanvasTkAgg(fig2, self.trends_frame)
-            self.trends_canvas.draw()
-            self.trends_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-
-    def _determine_winner(self, game):
-        return None
+            messagebox.showerror("Application Error", str(e))
