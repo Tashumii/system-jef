@@ -290,3 +290,4 @@ sports-management-dashboard/
 - **Inheritance**: `class GameForm(tk.Frame)` - Inherits Tkinter's Frame functionality
 - **Polymorphism**: `sport_obj.validate_score(score)` - Same method, different behavior per sport
 # crook
+# system-jef
