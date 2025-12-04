@@ -1,425 +1,236 @@
-"""
-Enhanced game list widget using Inheritance pattern.
-GameList inherits from ttk.Frame for displaying games in a table with filtering and search.
-"""
-
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
-from typing import List, Dict, Any
-import datetime
-
+import csv
 from database.interfaces import IDataManager
-
+from config.settings import LEAGUE_OPTIONS
 
 class GameList(ttk.Frame):
     """
-    Games List Display Widget.
-
-    Shows all sports games in a sortable, filterable table view.
-    Supports search, sport/league filtering, and export functionality.
-    Includes context menu for game management operations.
+    Games List Widget.
+    Theme: Casual Cyan-Green (Eco-Modern)
     """
 
     def __init__(self, parent, data_manager: IDataManager):
-        super().__init__(parent, padding=20)
-
+        super().__init__(parent, style='Card.TFrame', padding=20)
         self.data_manager = data_manager
-        self.all_games = []  # Store all games for filtering
-        self.filtered_games = []  # Store filtered results
-        self.setup_list()
+        self.all_games = []
+        self.filtered_games = []
+        self.setup_ui()
 
-    def setup_list(self):
-        """Set up the enhanced game list with filtering and search."""
-        # Header with title and controls
-        header_frame = ttk.Frame(self, style='Card.TFrame')
-        header_frame.pack(fill=tk.X, pady=(0, 20))
+    def setup_ui(self):
+        # --- Header ---
+        header = ttk.Frame(self, style='Card.TFrame')
+        header.pack(fill=tk.X, pady=(0, 15))
 
-        # Title
-        title = ttk.Label(header_frame, text="🎯 Games Management Center",
-                          style='Header.TLabel')
-        title.pack(side=tk.LEFT, pady=15)
+        ttk.Label(header, text="Current Records", style='Header.TLabel').pack(side=tk.LEFT)
+        self.stats_lbl = ttk.Label(header, text="0 Items", style='Stats.TLabel')
+        self.stats_lbl.pack(side=tk.RIGHT)
 
-        # Quick stats
-        self.stats_label = ttk.Label(header_frame, text="Total: 0 games",
-                                     style='Stats.TLabel')
-        self.stats_label.pack(side=tk.RIGHT, pady=15, padx=(0, 20))
+        # --- Filter Bar (Custom Green Styling) ---
+        bar = tk.Frame(self, bg='#23332e', height=50)
+        bar.pack(fill=tk.X, pady=(0, 15))
 
-        # Search and filter controls
-        controls_frame = ttk.Frame(self, style='Card.TFrame')
-        controls_frame.pack(fill=tk.X, pady=(0, 20))
+        # Styles for filter widgets
+        lbl_style = {'bg': '#23332e', 'fg': '#b0bec5', 'font': ('Segoe UI', 10)}
 
-        # Search bar
-        ttk.Label(controls_frame, text="🔍 Search:").grid(
-            row=0, column=0, padx=(15, 5), pady=10)
+        # Search
+        tk.Label(bar, text="Search:", **lbl_style).pack(side=tk.LEFT, padx=10)
         self.search_var = tk.StringVar()
-        self.search_var.trace('w', self.on_search_change)
-        search_entry = ttk.Entry(controls_frame, textvariable=self.search_var,
-                                 width=30, font=('Segoe UI', 10))
-        search_entry.grid(row=0, column=1, padx=(0, 20), pady=10, sticky='ew')
+        self.search_var.trace('w', self.on_search)
 
-        # Filters
-        ttk.Label(controls_frame, text="🏆 Sport:").grid(
-            row=0, column=2, padx=(0, 5), pady=10)
-        self.sport_filter = ttk.Combobox(controls_frame, values=["All", "Soccer", "Basketball"],
-                                         state="readonly", width=12)
-        self.sport_filter.set("All")
-        self.sport_filter.bind('<<ComboboxSelected>>',
-                               lambda e: self.apply_filters())
-        self.sport_filter.grid(row=0, column=3, padx=(0, 15), pady=10)
+        # Manual styling for Entry to match casual theme
+        search_entry = tk.Entry(bar, textvariable=self.search_var,
+                              bg='#2c3e39', fg='white', insertbackground='white',
+                              bd=0, highlightthickness=1, highlightbackground='#26a69a',
+                              font=('Segoe UI', 10))
+        search_entry.pack(side=tk.LEFT, padx=5, ipady=4, ipadx=5) # Spacious input
 
-        ttk.Label(controls_frame, text="🏟️ League:").grid(
-            row=0, column=4, padx=(0, 5), pady=10)
-        self.league_filter = ttk.Combobox(
-            controls_frame, values=["All"], state="readonly", width=15)
-        self.league_filter.set("All")
-        self.league_filter.bind('<<ComboboxSelected>>',
-                                lambda e: self.apply_filters())
-        self.league_filter.grid(row=0, column=5, padx=(0, 15), pady=10)
+        # Filter Combos
+        self.sport_filter = ttk.Combobox(bar, values=["All Sports"], state="readonly", width=12)
+        self.sport_filter.set("All Sports")
+        self.sport_filter.pack(side=tk.LEFT, padx=10, pady=10)
+        self.sport_filter.bind('<<ComboboxSelected>>', self.apply_filters)
 
-        # Sort options
-        ttk.Label(controls_frame, text="📊 Sort by:").grid(
-            row=0, column=6, padx=(0, 5), pady=10)
-        self.sort_by = ttk.Combobox(controls_frame,
-                                    values=[
-                                        "Date (Newest)", "Date (Oldest)", "Sport", "League"],
-                                    state="readonly", width=15)
-        self.sort_by.set("Date (Newest)")
-        self.sort_by.bind('<<ComboboxSelected>>',
-                          lambda e: self.apply_sorting())
-        self.sort_by.grid(row=0, column=7, padx=(0, 15), pady=10)
+        self.league_filter = ttk.Combobox(bar, values=["All Leagues"] + LEAGUE_OPTIONS, state="readonly", width=15)
+        self.league_filter.set("All Leagues")
+        self.league_filter.pack(side=tk.LEFT, padx=5, pady=10)
+        self.league_filter.bind('<<ComboboxSelected>>', self.apply_filters)
 
-        # Action buttons
-        buttons_frame = ttk.Frame(controls_frame)
-        buttons_frame.grid(row=0, column=8, padx=(10, 15), pady=10)
+        # Action Buttons (Using ttk style from main)
+        ttk.Button(bar, text="Reset", command=self.reset_filters).pack(side=tk.LEFT, padx=10)
+        ttk.Button(bar, text="Export CSV", command=self.export_csv).pack(side=tk.RIGHT, padx=10)
+        ttk.Button(bar, text="Standings", command=self.show_standings).pack(side=tk.RIGHT, padx=0)
 
-        ttk.Button(buttons_frame, text="🔄 Refresh",
-                   command=self.refresh_games).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(buttons_frame, text="📤 Export TXT",
-                   command=self.export_txt).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(buttons_frame, text="🗑️ Clear Filters",
-                   command=self.clear_filters).pack(side=tk.LEFT)
-
-        # Configure grid weights
-        controls_frame.grid_columnconfigure(1, weight=1)
-
-        # Create Treeview widget with enhanced styling
+        # --- Treeview (The Table) ---
         tree_frame = ttk.Frame(self, style='Card.TFrame')
         tree_frame.pack(fill=tk.BOTH, expand=True)
 
-        columns = ("ID", "Sport", "League", "Team 1",
-                   "Team 2", "Score", "Date", "Winner")
-        self.tree = ttk.Treeview(
-            tree_frame, columns=columns, show="headings", height=20)
+        cols = ("ID", "Date", "Sport", "League", "Match", "Score", "Winner")
+        self.tree = ttk.Treeview(tree_frame, columns=cols, show="headings", selectmode="browse")
 
-        # Configure columns with better styling
-        column_config = {
-            "ID": {"width": 60, "anchor": "center"},
-            "Sport": {"width": 100, "anchor": "center"},
-            "League": {"width": 150, "anchor": "w"},
-            "Team 1": {"width": 140, "anchor": "w"},
-            "Team 2": {"width": 140, "anchor": "w"},
-            "Score": {"width": 80, "anchor": "center"},
-            "Date": {"width": 100, "anchor": "center"},
-            "Winner": {"width": 120, "anchor": "w"}
-        }
+        # Scrollbar
+        sb = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscroll=sb.set)
 
-        for col, config in column_config.items():
-            self.tree.heading(
-                col, text=col, command=lambda c=col: self.sort_by_column(c))
-            self.tree.column(col, **config)
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
 
-        # Style the treeview with modern theme
+        # Table Styling (The "Cyan Green" effect)
         style = ttk.Style()
         style.configure("Treeview",
-                        background="#2d2d2d",
-                        foreground="#e0e0e0",
-                        fieldbackground="#2d2d2d",
-                        font=('SF Pro Display', 9),
-                        borderwidth=0,
-                        relief='flat')
+                        background="#23332e",
+                        fieldbackground="#23332e",
+                        foreground="#e8f5e9",
+                        rowheight=30, # Casual spacing
+                        font=('Segoe UI', 10),
+                        borderwidth=0)
+
         style.configure("Treeview.Heading",
-                        background="#404040",
-                        foreground="#ffffff",
-                        font=('SF Pro Display', 10, 'bold'),
-                        borderwidth=0,
-                        relief='flat')
+                        background="#182421",
+                        foreground="#26a69a", # Cyan Green text
+                        font=('Segoe UI', 10, 'bold'),
+                        borderwidth=0)
+
         style.map("Treeview",
-                  background=[('selected', '#00d4aa'),
-                              ('!selected', '#2d2d2d')],
-                  foreground=[('selected', '#ffffff'),
-                              ('!selected', '#e0e0e0')])
+                  background=[('selected', '#26a69a')],
+                  foreground=[('selected', 'white')])
 
-        # Modern scrollbar styling
-        style.configure('TScrollbar',
-                        background='#404040',
-                        troughcolor='#2d2d2d',
-                        borderwidth=0,
-                        arrowcolor='#cccccc',
-                        width=16)
-        style.map('TScrollbar',
-                  background=[('active', '#4a4a4a')])
+        # Config Columns
+        self.tree.column("ID", width=50, anchor="center")
+        self.tree.column("Date", width=100, anchor="center")
+        self.tree.column("Sport", width=100, anchor="center")
+        self.tree.column("League", width=150)
+        self.tree.column("Match", width=250)
+        self.tree.column("Score", width=80, anchor="center")
+        self.tree.column("Winner", width=150)
 
-        # Add scrollbars
-        v_scrollbar = ttk.Scrollbar(
-            tree_frame, orient=tk.VERTICAL, command=self.tree.yview)
-        h_scrollbar = ttk.Scrollbar(
-            tree_frame, orient=tk.HORIZONTAL, command=self.tree.xview)
-        self.tree.configure(yscrollcommand=v_scrollbar.set,
-                            xscrollcommand=h_scrollbar.set)
+        for c in cols: self.tree.heading(c, text=c, command=lambda _c=c: self.sort_col(_c))
 
-        # Pack treeview and scrollbars
-        self.tree.grid(row=0, column=0, sticky='nsew')
-        v_scrollbar.grid(row=0, column=1, sticky='ns')
-        h_scrollbar.grid(row=1, column=0, sticky='ew')
+        # Context Menu
+        self.menu = tk.Menu(self, tearoff=0, bg='#23332e', fg='white', activebackground='#26a69a')
+        self.menu.add_command(label="❌ Delete Record", command=self.delete_game)
+        self.tree.bind("<Button-3>", lambda e: self.menu.post(e.x_root, e.y_root))
 
-        tree_frame.grid_rowconfigure(0, weight=1)
-        tree_frame.grid_columnconfigure(0, weight=1)
-
-        # Bind events
-        self.tree.bind('<Double-1>', self.on_game_double_click)
-        self.tree.bind('<Return>', lambda e: self.edit_selected_game())
-        self.tree.bind('<Delete>', lambda e: self.delete_selected_game())
-
-        # Context menu
-        self.context_menu = tk.Menu(
-            self, tearoff=0, bg='#2d2d2d', fg='#e0e0e0')
-        self.context_menu.add_command(
-            label="✏️ Edit Game", command=self.edit_selected_game)
-        self.context_menu.add_command(
-            label="🗑️ Delete Game", command=self.delete_selected_game)
-        self.context_menu.add_separator()
-        self.context_menu.add_command(
-            label="📋 Copy Details", command=self.copy_game_details)
-
-        self.tree.bind('<Button-3>', self.show_context_menu)
-
-    def show_context_menu(self, event):
-        """Show context menu on right click."""
-        item = self.tree.identify_row(event.y)
-        if item:
-            self.tree.selection_set(item)
-            self.context_menu.post(event.x_root, event.y_root)
-
-    def on_game_double_click(self, event):
-        """Handle double-click on game."""
-        self.edit_selected_game()
-
-    def edit_selected_game(self):
-        """Edit the selected game."""
-        selection = self.tree.selection()
-        if not selection:
-            messagebox.showwarning(
-                "No Selection", "Please select a game to edit.")
-            return
-
-        messagebox.showinfo(
-            "Feature Not Available",
-            "Edit functionality is not yet implemented.\n\n"
-            "To modify a game, please delete it and add a new one.")
-
-    def delete_selected_game(self):
-        """Delete the selected game."""
-        selection = self.tree.selection()
-        if not selection:
-            messagebox.showwarning(
-                "No Selection", "Please select a game to delete.")
-            return
-
-        if messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this game?\n\nThis action cannot be undone."):
-            item = selection[0]
-            values = self.tree.item(item, 'values')
-            game_id = values[0]
-
-            # Actually delete the game
-            if self.data_manager.delete_game(game_id):
-                messagebox.showinfo("Success", "Game deleted successfully!")
-                self.refresh_games()
-            else:
-                messagebox.showerror("Error", "Failed to delete game.")
-
-    def copy_game_details(self):
-        """Copy game details to clipboard."""
-        selection = self.tree.selection()
-        if not selection:
-            return
-
-        item = selection[0]
-        values = self.tree.item(item, 'values')
-        details = f"Game ID: {values[0]}\nSport: {values[1]}\nLeague: {values[2]}\n{values[3]} vs {values[4]}\nScore: {values[5]}\nDate: {values[6]}"
-
-        self.clipboard_clear()
-        self.clipboard_append(details)
-        messagebox.showinfo("Copied", "Game details copied to clipboard!")
-
-    def on_search_change(self, *args):
-        """Handle search input changes with debouncing."""
-        self.after(300, self.apply_filters)  # Debounce search
-
-    def apply_filters(self):
-        """Apply search and filter criteria."""
-        search_term = self.search_var.get().lower()
-        sport_filter = self.sport_filter.get()
-        league_filter = self.league_filter.get()
-
-        self.filtered_games = []
-
-        for game in self.all_games:
-            # Apply filters
-            if sport_filter != "All" and game['sport'] != sport_filter:
-                continue
-            if league_filter != "All" and game['league'] != league_filter:
-                continue
-
-            # Apply search
-            if search_term:
-                searchable_text = f"{game['sport']} {game['league']} {game['team1']} {game['team2']} {game['score']}".lower(
-                )
-                if search_term not in searchable_text:
-                    continue
-
-            self.filtered_games.append(game)
-
-        self.apply_sorting()
-
-    def apply_sorting(self):
-        """Apply sorting to filtered games."""
-        sort_option = self.sort_by.get()
-
-        if sort_option == "Date (Newest)":
-            self.filtered_games.sort(key=lambda x: x['date'], reverse=True)
-        elif sort_option == "Date (Oldest)":
-            self.filtered_games.sort(key=lambda x: x['date'])
-        elif sort_option == "Sport":
-            self.filtered_games.sort(key=lambda x: x['sport'])
-        elif sort_option == "League":
-            self.filtered_games.sort(key=lambda x: x['league'])
-
-        self.display_games()
-
-    def sort_by_column(self, col):
-        """Sort by clicked column."""
-        if col == "Date":
-            current_sort = self.sort_by.get()
-            if current_sort == "Date (Newest)":
-                self.sort_by.set("Date (Oldest)")
-            else:
-                self.sort_by.set("Date (Newest)")
-        elif col == "Sport":
-            self.sort_by.set("Sport")
-        elif col == "League":
-            self.sort_by.set("League")
-        else:
-            return  # Don't sort by other columns
-
-        self.apply_sorting()
-
-    def display_games(self):
-        """Display filtered games in treeview."""
-        # Clear existing items
-        for item in self.tree.get_children():
-            self.tree.delete(item)
-
-        # Add filtered games to treeview
-        for game in self.filtered_games:
-            winner = self.determine_winner(game)
-            self.tree.insert("", tk.END, values=(
-                game['id'],
-                game['sport'],
-                game['league'],
-                game['team1'],
-                game['team2'],
-                game['score'],
-                game['date'],
-                winner
-            ))
-
-        # Update stats
-        self.stats_label.config(
-            text=f"Showing: {len(self.filtered_games)} games")
-
-    def clear_filters(self):
-        """Clear all filters and search."""
-        self.search_var.set("")
-        self.sport_filter.set("All")
-        self.league_filter.set("All")
-        self.sort_by.set("Date (Newest)")
-        self.filtered_games = self.all_games.copy()
-        self.display_games()
+        self.refresh_games()
 
     def refresh_games(self):
-        """Refresh the games list from database."""
         try:
-            # Abstraction: Use the data manager interface to fetch games
             self.all_games = self.data_manager.fetch_games()
-            self.filtered_games = self.all_games.copy()
 
-            # Update league filter options
-            leagues = sorted(set(game['league'] for game in self.all_games))
-            self.league_filter['values'] = ["All"] + leagues
-            if self.league_filter.get() not in self.league_filter['values']:
-                self.league_filter.set("All")
+            # Update sports filter dynamically
+            sports = ["All Sports"]
+            if hasattr(self.data_manager, 'fetch_sports'):
+                sports += self.data_manager.fetch_sports()
+            self.sport_filter['values'] = sports
 
             self.apply_filters()
+        except: pass
 
-        except Exception as e:
-            messagebox.showerror(
-                "Database Error", f"Failed to refresh games: {e}")
+    def apply_filters(self, event=None):
+        s_filter = self.sport_filter.get()
+        l_filter = self.league_filter.get()
+        search = self.search_var.get().lower()
 
-    def export_txt(self):
-        """Export filtered games to TXT file."""
+        self.filtered_games = []
+        for g in self.all_games:
+            if s_filter != "All Sports" and g['sport'] != s_filter: continue
+            if l_filter != "All Leagues" and g['league'] != l_filter: continue
+
+            full_str = f"{g['sport']} {g['league']} {g['team1']} {g['team2']}".lower()
+            if search and search not in full_str: continue
+
+            self.filtered_games.append(g)
+
+        self.populate_tree()
+
+    def populate_tree(self):
+        for i in self.tree.get_children(): self.tree.delete(i)
+
+        for g in self.filtered_games:
+            match = f"{g['team1']} vs {g['team2']}"
+            winner = self.get_winner(g)
+            self.tree.insert("", "end", values=(g['id'], g['date'], g['sport'], g['league'], match, g['score'], winner))
+
+        self.stats_lbl.config(text=f"{len(self.filtered_games)} Records")
+
+    def get_winner(self, g):
         try:
-            filename = filedialog.asksaveasfilename(
-                defaultextension=".txt",
-                filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
-                title="Export Games to TXT"
-            )
+            s1, s2 = map(int, g['score'].split('-'))
+            if s1 > s2: return g['team1']
+            elif s2 > s1: return g['team2']
+            return "Draw"
+        except: return "-"
 
-            if filename:
-                with open(filename, 'w', encoding='utf-8') as txtfile:
-                    # Write header
-                    txtfile.write(
-                        "SPORTS MANAGEMENT DASHBOARD - GAMES EXPORT\n")
-                    txtfile.write("=" * 50 + "\n\n")
+    def on_search(self, *args):
+        self.after(300, self.apply_filters)
 
-                    # Write summary
-                    txtfile.write(
-                        f"Total Games Exported: {len(self.filtered_games)}\n")
-                    txtfile.write(
-                        f"Export Date: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+    def reset_filters(self):
+        self.search_var.set("")
+        self.sport_filter.set("All Sports")
+        self.league_filter.set("All Leagues")
+        self.apply_filters()
 
-                    # Write games
-                    for i, game in enumerate(self.filtered_games, 1):
-                        winner = self.determine_winner(game)
-                        txtfile.write(f"Game #{i}\n")
-                        txtfile.write("-" * 20 + "\n")
-                        txtfile.write(f"Sport: {game['sport']}\n")
-                        txtfile.write(f"League: {game['league']}\n")
-                        txtfile.write(
-                            f"Teams: {game['team1']} vs {game['team2']}\n")
-                        txtfile.write(f"Score: {game['score']}\n")
-                        txtfile.write(f"Date: {game['date']}\n")
-                        txtfile.write(f"Winner: {winner}\n")
-                        txtfile.write("\n")
+    def delete_game(self):
+        sel = self.tree.selection()
+        if not sel: return
 
-                messagebox.showinfo(
-                    "Export Complete", f"Exported {len(self.filtered_games)} games to {filename}")
+        item_id = self.tree.item(sel[0])['values'][0]
+        if messagebox.askyesno("Delete", "Delete this record permanently?"):
+            if self.data_manager.delete_game(item_id):
+                self.refresh_games()
 
-        except Exception as e:
-            messagebox.showerror("Export Error", f"Failed to export TXT: {e}")
+    def export_csv(self):
+        path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV", "*.csv")])
+        if path:
+            with open(path, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(["ID", "Date", "Sport", "League", "Team1", "Team2", "Score"])
+                for g in self.filtered_games:
+                    writer.writerow([g['id'], g['date'], g['sport'], g['league'], g['team1'], g['team2'], g['score']])
+            messagebox.showinfo("Success", "Exported successfully.")
 
-    def determine_winner(self, game) -> str:
-        """Determine winner from game score."""
-        try:
-            score_parts = game['score'].split('-')
-            if len(score_parts) == 2:
-                score1 = int(score_parts[0])
-                score2 = int(score_parts[1])
-                if score1 > score2:
-                    return game['team1']
-                elif score2 > score1:
-                    return game['team2']
+    def show_standings(self):
+        league = self.league_filter.get()
+        if league == "All Leagues":
+            messagebox.showinfo("Info", "Please select a specific League first.")
+            return
+
+        # Simple standings logic
+        scores = {}
+        for g in self.filtered_games:
+            t1, t2 = g['team1'], g['team2']
+            if t1 not in scores: scores[t1] = 0
+            if t2 not in scores: scores[t2] = 0
+
+            try:
+                s1, s2 = map(int, g['score'].split('-'))
+                if s1 > s2: scores[t1] += 3
+                elif s2 > s1: scores[t2] += 3
                 else:
-                    return "Draw"
-        except (ValueError, IndexError):
-            pass
-        return "Unknown"
+                    scores[t1] += 1
+                    scores[t2] += 1
+            except: pass
+
+        # Popup
+        top = tk.Toplevel(self)
+        top.title(f"Standings: {league}")
+        top.geometry("400x400")
+        top.configure(bg='#182421')
+
+        tk.Label(top, text=f"{league} Ranking", font=('Segoe UI', 14, 'bold'),
+                bg='#182421', fg='#26a69a').pack(pady=15)
+
+        frame = tk.Frame(top, bg='#23332e', padx=20, pady=20)
+        frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0,20))
+
+        sorted_teams = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+
+        for idx, (team, pts) in enumerate(sorted_teams, 1):
+            row = tk.Frame(frame, bg='#23332e')
+            row.pack(fill=tk.X, pady=5)
+            tk.Label(row, text=f"{idx}.", font=('Segoe UI', 11, 'bold'), fg='#26a69a', bg='#23332e', width=3).pack(side=tk.LEFT)
+            tk.Label(row, text=team, font=('Segoe UI', 11), fg='white', bg='#23332e').pack(side=tk.LEFT)
+            tk.Label(row, text=f"{pts} pts", font=('Segoe UI', 11, 'bold'), fg='#66bb6a', bg='#23332e').pack(side=tk.RIGHT)
+
+    def sort_col(self, col):
+        pass # sorting placeholder

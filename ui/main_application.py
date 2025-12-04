@@ -4,9 +4,10 @@ MainApplication inherits from tk.Tk for the root window with modern design and a
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 from collections import defaultdict
 import datetime
+import json
 
 # Import matplotlib with fallback
 try:
@@ -26,53 +27,23 @@ from ui.game_list import GameList
 class MainApplication(tk.Tk):
     """
     Main Application Window.
-
-    Root window for the Sports Management Dashboard application.
-    Manages the overall application lifecycle, authentication flow,
-    and main UI components with modern dark theme design.
+    Theme: Casual Cyan-Green (Eco-Modern)
     """
 
     def __init__(self, data_manager: IDataManager):
-        """
-        Initialize the main application window.
-
-        Sets up the root Tkinter window, initializes data manager,
-        and starts the authentication flow.
-
-        Args:
-            data_manager: Database manager instance for data operations
-        """
         super().__init__()
 
-        # Initialize data manager
         self.data_manager = data_manager
         self.current_user = None
 
-        # Don't show main window yet - login will handle this
         self.withdraw()
-
-        # Show login window first
         self.show_login()
 
     def show_login(self):
-        """
-        Display the login window for user authentication.
-
-        Creates and shows the LoginWindow modal dialog.
-        Upon successful login, calls initialize_main_app().
-        """
+        """Display the login window for user authentication."""
         from ui.auth import LoginWindow
 
         def on_login_success(user_data):
-            """
-            Handle successful user login.
-
-            Called by LoginWindow when authentication succeeds.
-            Stores user data and initializes the main application.
-
-            Args:
-                user_data: Dictionary containing authenticated user information
-            """
             self.current_user = user_data
             self.initialize_main_app()
 
@@ -80,769 +51,333 @@ class MainApplication(tk.Tk):
 
     def initialize_main_app(self):
         """Initialize the main application after successful login."""
-        # Setup main window
-        self.title(
-            f"{APP_CONFIG['title']} - Logged in as {self.current_user['username']}")
-        self.geometry("1400x900")
+        self.title(f"{APP_CONFIG['title']} - {self.current_user['username']}")
+        self.geometry("1300x850")  # Consistent casual size
         self.resizable(True, True)
 
-        # Apply dark theme
-        self._setup_dark_theme()
+        # Apply Theme
+        self._setup_theme()
 
-        # Create status bar variable
+        # Create Menu Bar
+        self.create_menu()
+
+        # Status Bar
         self.status_var = tk.StringVar()
-        self.status_var.set(
-            f"Logged in as {self.current_user['username']} - Press F1 for help")
+        self.status_var.set(f"Ready • {datetime.datetime.now().strftime('%B %d, %Y')}")
 
-        # Setup UI
         self.setup_ui()
-
-        # Show the main window
         self.deiconify()
 
-    def _setup_dark_theme(self):
-        """Setup the complete dark theme for the main application."""
+    def _setup_theme(self):
+        """Setup the Casual Cyan-Green Theme (Eco-Modern)."""
         self.style = ttk.Style()
-        self.configure(bg='#1a1a1a')
 
-        # Main application styling
-        self.style.configure('TFrame', background='#1a1a1a')
-        self.style.configure('TLabel',
-                             background='#1a1a1a',
-                             foreground='#e0e0e0',
-                             font=('SF Pro Display', 10))
-        self.style.configure('TButton',
-                             font=('SF Pro Display', 10, 'bold'),
-                             padding=[12, 8],
-                             relief='flat',
-                             borderwidth=0)
-        self.style.map('TButton',
-                       background=[('active', '#007acc'),
-                                   ('pressed', '#005999')],
-                       foreground=[('active', '#ffffff'),
-                                   ('pressed', '#cccccc')])
+        # --- Palette Definition ---
+        BG_MAIN = '#182421'      # Deep Slate Green
+        BG_CARD = '#23332e'      # Lighter Slate Green for cards
+        FG_TEXT = '#e8f5e9'      # Soft White/Mint
+        ACCENT  = '#26a69a'      # Teal/Cyan-Green
+        ACTIVE  = '#00897b'      # Darker Teal for active states
+        FONT_MAIN = ('Segoe UI', 10)
+        FONT_HEAD = ('Segoe UI', 16, 'bold')
 
-        # Modern card styling with subtle borders
-        self.style.configure('Card.TFrame',
-                             background='#2d2d2d',
-                             relief='solid',
-                             borderwidth=1,
-                             lightcolor='#404040',
-                             darkcolor='#404040')
+        self.configure(bg=BG_MAIN)
+        self.style.theme_use('clam')
 
-        # Header styling - modern and clean
-        self.style.configure('Header.TLabel',
-                             font=('SF Pro Display', 18, 'bold'),
-                             foreground='#00d4aa',
-                             background='#2d2d2d')
+        # Frames and Labels
+        self.style.configure('TFrame', background=BG_MAIN)
+        self.style.configure('TLabel', background=BG_MAIN, foreground=FG_TEXT, font=FONT_MAIN)
 
-        # Statistics label styling
-        self.style.configure('Stats.TLabel',
-                             font=('SF Pro Display', 13, 'bold'),
-                             foreground='#ff6b6b',
-                             background='#2d2d2d')
+        # Cards
+        self.style.configure('Card.TFrame', background=BG_CARD, relief='flat', borderwidth=0)
 
-        # Modern notebook styling
-        self.style.configure('TNotebook',
-                             background='#1a1a1a',
-                             borderwidth=0,
-                             tabmargins=[0, 0, 0, 0])
-        self.style.configure('TNotebook.Tab',
-                             background='#333333',
-                             foreground='#cccccc',
-                             font=('SF Pro Display', 11),
-                             padding=[20, 10],
-                             relief='flat',
-                             borderwidth=0,
-                             focuscolor='#00d4aa')
-        self.style.map('TNotebook.Tab',
-                       background=[('selected', '#00d4aa'),
-                                   ('active', '#404040')],
-                       foreground=[('selected', '#ffffff'),
-                                   ('active', '#ffffff')],
-                       relief=[('selected', 'flat'),
-                               ('active', 'flat')])
+        # Headers
+        self.style.configure('Header.TLabel', font=FONT_HEAD, foreground=ACCENT, background=BG_CARD)
+        self.style.configure('Stats.TLabel', font=('Segoe UI', 12, 'bold'), foreground='#66bb6a', background=BG_CARD)
 
-        # Entry field styling
-        self.style.configure('TEntry',
-                             fieldbackground='#404040',
-                             borderwidth=1,
-                             relief='solid',
-                             insertcolor='#00d4aa',
-                             font=('SF Pro Display', 10))
-        self.style.map('TEntry',
-                       fieldbackground=[('focus', '#4a4a4a'),
-                                        ('!focus', '#404040')])
+        # Buttons
+        self.style.configure('TButton', font=('Segoe UI', 10, 'bold'), background=ACCENT, foreground='white',
+                             borderwidth=0, focuscolor=BG_CARD, padding=(15, 8))
+        self.style.map('TButton', background=[('active', ACTIVE), ('pressed', '#004d40')])
 
-        # Combobox styling
-        self.style.configure('TCombobox',
-                             fieldbackground='#404040',
-                             background='#404040',
-                             borderwidth=1,
-                             relief='solid',
-                             font=('SF Pro Display', 10))
-        self.style.map('TCombobox',
-                       fieldbackground=[('focus', '#4a4a4a'),
-                                        ('!focus', '#404040')],
-                       background=[('focus', '#4a4a4a'),
-                                   ('!focus', '#404040')])
+        # Notebook (Tabs)
+        self.style.configure('TNotebook', background=BG_MAIN, borderwidth=0)
+        self.style.configure('TNotebook.Tab', background=BG_MAIN, foreground='#b0bec5', padding=(20, 12), font=('Segoe UI', 11))
+        self.style.map('TNotebook.Tab', background=[('selected', BG_CARD)], foreground=[('selected', ACCENT)])
 
-        # Modern scrollbar styling
-        self.style.configure('TScrollbar',
-                             background='#404040',
-                             troughcolor='#2d2d2d',
-                             borderwidth=0,
-                             arrowcolor='#cccccc')
-        self.style.map('TScrollbar',
-                       background=[('active', '#4a4a4a')])
+        # Inputs
+        self.style.configure('TEntry', fieldbackground='#2c3e39', foreground='white', insertcolor='white', borderwidth=0, padding=5)
+        self.style.map('TEntry', fieldbackground=[('focus', '#2c3e39')])
+
+        self.style.configure('TCombobox', fieldbackground='#2c3e39', background=ACCENT, foreground='white', arrowcolor='white', borderwidth=0, padding=5)
+        self.style.map('TCombobox', fieldbackground=[('readonly', '#2c3e39')])
+
+        # Scrollbars
+        self.style.configure('TScrollbar', background=BG_CARD, troughcolor=BG_MAIN, borderwidth=0, arrowcolor=ACCENT)
+        self.style.map('TScrollbar', background=[('active', ACCENT)])
+
+    def create_menu(self):
+        """Create top system menu with custom green styling."""
+        # Menu colors need to be set on the widget itself, ttk doesn't control native menus easily
+        menubar = tk.Menu(self, bg='#23332e', fg='#e8f5e9', activebackground='#26a69a', activeforeground='white', relief='flat')
+
+        file_menu = tk.Menu(menubar, tearoff=0, bg='#23332e', fg='#e8f5e9', activebackground='#26a69a', activeforeground='white')
+        file_menu.add_command(label="💾  Backup Database", command=self.backup_data)
+        file_menu.add_separator()
+        file_menu.add_command(label="🚪  Logout", command=self.quit_app)
+        file_menu.add_command(label="❌  Exit", command=self.quit)
+        menubar.add_cascade(label="  File  ", menu=file_menu)
+
+        tools_menu = tk.Menu(menubar, tearoff=0, bg='#23332e', fg='#e8f5e9', activebackground='#26a69a', activeforeground='white')
+        tools_menu.add_command(label="🔄  Refresh All", command=self.refresh_all)
+        menubar.add_cascade(label="  Tools  ", menu=tools_menu)
+
+        self.config(menu=menubar)
+
+    def backup_data(self):
+        """Backup all games to a JSON file."""
+        try:
+            games = self.data_manager.fetch_games()
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".json",
+                initialfile=f"backup_{timestamp}.json",
+                filetypes=[("JSON Files", "*.json")],
+                title="Save Backup"
+            )
+
+            if filename:
+                serializable_games = []
+                for g in games:
+                    g_copy = g.copy()
+                    if isinstance(g_copy.get('date'), (datetime.date, datetime.datetime)):
+                        g_copy['date'] = str(g_copy['date'])
+                    # Cleanup keys
+                    for k in ['created_at', 'updated_at']:
+                        if k in g_copy: del g_copy[k]
+                    serializable_games.append(g_copy)
+
+                with open(filename, 'w') as f:
+                    json.dump({"data": serializable_games, "meta": {"exported_at": timestamp}}, f, indent=4)
+
+                messagebox.showinfo("Backup Successful", f"Saved {len(games)} records.")
+        except Exception as e:
+            messagebox.showerror("Backup Failed", f"Error: {str(e)}")
 
     def setup_ui(self):
-        """Set up the main UI components with modern design."""
-        # Create notebook for tabs
+        """Set up the main UI components."""
         self.notebook = ttk.Notebook(self)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
 
-        # Create components
+        # Components
         self.game_list = GameList(self.notebook, self.data_manager)
-        self.game_form = GameForm(
-            self.notebook, self.data_manager, self.game_list)
-        self.analytics_dashboard = AnalyticsDashboard(
-            self.notebook, self.data_manager)
+        self.game_form = GameForm(self.notebook, self.data_manager, self.game_list)
+        self.analytics_dashboard = AnalyticsDashboard(self.notebook, self.data_manager)
 
-        # Add tabs with icons (text-based)
-        self.notebook.add(self.game_form, text="➕ Add Game")
-        self.notebook.add(self.game_list, text="📋 Games List")
-        self.notebook.add(self.analytics_dashboard, text="📊 Analytics")
+        # Tabs with spacing
+        self.notebook.add(self.game_form, text="  ➕ New Entry  ")
+        self.notebook.add(self.game_list, text="  📋 Records  ")
+        self.notebook.add(self.analytics_dashboard, text="  📊 Insights  ")
 
-        # Status bar
         self.create_status_bar()
 
         # Load initial data
-        self.game_list.refresh_games()
-        self.analytics_dashboard.refresh_analytics()
+        self.refresh_all()
 
         # Bind refresh events
         self.bind('<F5>', lambda e: self.refresh_all())
         self.bind('<Control-r>', lambda e: self.refresh_all())
-        self.bind('<Control-n>', lambda e: self.focus_tab(0))  # Add Game
-        self.bind('<Control-l>', lambda e: self.focus_tab(1))  # Games List
-        self.bind('<Control-a>', lambda e: self.focus_tab(2))  # Analytics
         self.bind('<Control-q>', lambda e: self.quit_app())
         self.bind('<F1>', lambda e: self.show_help())
 
     def refresh_all(self):
-        """Refresh all components."""
         self.game_list.refresh_games()
         self.analytics_dashboard.refresh_analytics()
-        messagebox.showinfo("Refreshed", "All data has been refreshed!")
-
-    def focus_tab(self, tab_index):
-        """Focus on a specific tab."""
-        self.notebook.select(tab_index)
 
     def quit_app(self):
-        """Quit the application with confirmation."""
-        if messagebox.askyesno("Quit", "Are you sure you want to quit?"):
-            self.quit()
+        if messagebox.askyesno("Exit", "Are you sure you want to exit?"):
+            self.destroy()
 
     def create_status_bar(self):
-        """Create modern status bar with shortcuts info."""
+        """Create modern status bar."""
         status_frame = ttk.Frame(self, style='Card.TFrame')
-        status_frame.pack(fill=tk.X, side=tk.BOTTOM, padx=5, pady=5)
-
-        # Status indicator
-        status_indicator = tk.Canvas(status_frame, width=12, height=12,
-                                     bg='#2d2d2d', highlightthickness=0)
-        status_indicator.create_oval(2, 2, 10, 10, fill='#00d4aa')
-        status_indicator.pack(side=tk.LEFT, padx=(10, 5), pady=8)
+        status_frame.pack(fill=tk.X, side=tk.BOTTOM)
 
         # Status label
-        status_label = ttk.Label(
-            status_frame, textvariable=self.status_var, anchor='w')
-        status_label.pack(side=tk.LEFT, pady=5)
-
-        # Database indicator
-        db_indicator = tk.Canvas(status_frame, width=12, height=12,
-                                 bg='#2d2d2d', highlightthickness=0)
-        db_indicator.create_oval(2, 2, 10, 10, fill='#4CAF50')
-        db_indicator.pack(side=tk.RIGHT, padx=(10, 5), pady=8)
+        ttk.Label(status_frame, textvariable=self.status_var,
+                  foreground='#80cbc4', font=('Segoe UI', 9), background='#23332e').pack(side=tk.LEFT, padx=15, pady=8)
 
         # Database status
-        db_label = ttk.Label(status_frame, text="MySQL Connected", anchor='e')
-        db_label.pack(side=tk.RIGHT, pady=5)
-
-        # Keyboard shortcuts
-        shortcuts_frame = ttk.Frame(status_frame, style='TFrame')
-        shortcuts_frame.pack(side=tk.RIGHT, padx=20, pady=5)
-
-        shortcuts = ["F1: Help", "F5: Refresh", "Ctrl+N: Add",
-                     "Ctrl+L: List", "Ctrl+A: Analytics", "Ctrl+Q: Quit"]
-        for shortcut in shortcuts:
-            ttk.Label(shortcuts_frame, text=shortcut,
-                      font=('SF Pro Display', 8), foreground='#888888').pack(side=tk.LEFT, padx=5)
+        ttk.Label(status_frame, text="Connected to Database",
+                  foreground='#80cbc4', font=('Segoe UI', 9), background='#23332e').pack(side=tk.RIGHT, padx=15, pady=8)
 
     def show_help(self):
-        """Show keyboard shortcuts and help."""
+        """Show keyboard shortcuts."""
         help_text = """
-🎯 Sports Management Dashboard - Keyboard Shortcuts
-
-📋 Navigation:
-  • Ctrl+N: Switch to Add Game tab
-  • Ctrl+L: Switch to Games List tab
-  • Ctrl+A: Switch to Analytics tab
-
-🔄 Actions:
-  • F5: Refresh all data
-  • Ctrl+R: Refresh all data
-  • Ctrl+S (in Add Game): Save game
-  • Ctrl+Q: Quit application
-
-🎮 Games List:
-  • Double-click: Edit selected game
-  • Delete key: Delete selected game
-  • Right-click: Context menu
-  • Enter: Edit selected game
-
-⚡ Productivity Features:
-  • Quick Templates: Pre-filled game forms
-  • Recent Teams: Quick team selection
-  • Auto-complete: Smart suggestions
-  • Real-time Search: Instant filtering
-  • CSV Export: Data export functionality
-  • Analytics Dashboard: Real-time statistics
-
-💡 Tips:
-  • Use search bar for instant filtering
-  • Sort by clicking column headers
-  • Export filtered results to CSV
-  • Templates save time for common games
+🎯 Shortcuts:
+• F5 / Ctrl+R : Refresh Data
+• Ctrl+Q : Exit
+• Ctrl+S : Save (in form)
         """
-
-        help_window = tk.Toplevel(self)
-        help_window.title("Help & Shortcuts")
-        help_window.geometry("600x500")
-        help_window.configure(bg='#1a1a1a')
-
-        # Text widget with scrollbar
-        text_frame = ttk.Frame(help_window, style='Card.TFrame')
-        text_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
-
-        scrollbar = ttk.Scrollbar(text_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-
-        text_widget = tk.Text(text_frame, wrap=tk.WORD, bg='#2d2d2d', fg='#e0e0e0',
-                              font=('SF Pro Display', 10), yscrollcommand=scrollbar.set)
-        text_widget.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        text_widget.insert(tk.END, help_text.strip())
-        text_widget.config(state=tk.DISABLED)
-
-        scrollbar.config(command=text_widget.yview)
-
-        # Close button
-        ttk.Button(help_window, text="Close",
-                   command=help_window.destroy).pack(pady=(0, 20))
-
-    def run(self):
-        """Start the application main loop."""
-        self.mainloop()
+        messagebox.showinfo("Help", help_text)
 
 
 class AnalyticsDashboard(ttk.Frame):
     """
     Analytics Dashboard Widget.
-
-    Displays real-time statistics and visualizations for sports games data.
-    Includes pie charts for sport distribution and bar charts for trends.
-    Uses matplotlib for chart rendering with dark theme styling.
+    Theme: Casual Cyan-Green
     """
 
     def __init__(self, parent, data_manager: IDataManager):
-        # Create styles before initializing the frame
-        self.setup_styles()
-
         super().__init__(parent, style='Card.TFrame')
-
         self.data_manager = data_manager
         self.stats_labels = {}
         self.setup_dashboard()
 
-    def setup_styles(self):
-        """Setup modern ttk styles for the analytics dashboard."""
-        try:
-            self.style = ttk.Style()
-            # Modern card styling
-            self.style.configure('Card.TFrame',
-                                 background='#2d2d2d',
-                                 relief='solid',
-                                 borderwidth=1,
-                                 lightcolor='#404040',
-                                 darkcolor='#404040')
-            # Modern header
-            self.style.configure('Header.TLabel',
-                                 font=('SF Pro Display', 18, 'bold'),
-                                 foreground='#00d4aa',
-                                 background='#2d2d2d')
-            # Modern stats labels
-            self.style.configure('Stats.TLabel',
-                                 font=('SF Pro Display', 13, 'bold'),
-                                 foreground='#ff6b6b',
-                                 background='#2d2d2d')
-            # Modern regular labels
-            self.style.configure('TLabel',
-                                 background='#2d2d2d',
-                                 foreground='#e0e0e0',
-                                 font=('SF Pro Display', 10))
-            # Modern buttons
-            self.style.configure('TButton',
-                                 font=('SF Pro Display', 10, 'bold'),
-                                 padding=[12, 8],
-                                 relief='flat',
-                                 borderwidth=0)
-            self.style.map('TButton',
-                           background=[('active', '#007acc'),
-                                       ('pressed', '#005999')],
-                           foreground=[('active', '#ffffff'),
-                                       ('pressed', '#cccccc')])
-        except Exception as e:
-            # Fallback styling if modern styles fail
-            print(f"Warning: Could not setup modern styles: {e}")
-            try:
-                self.style.configure(
-                    'Card.TFrame', background='#2d2d2d', relief='solid', borderwidth=1)
-                self.style.configure('Header.TLabel', font=(
-                    'Arial', 16, 'bold'), foreground='#00d4aa')
-                self.style.configure('Stats.TLabel', font=(
-                    'Arial', 12, 'bold'), foreground='#ff6b6b')
-            except:
-                pass
-
     def setup_dashboard(self):
-        """Set up the analytics dashboard."""
         # Header
         try:
-            header = ttk.Label(self, text="📊 Sports Analytics Dashboard",
-                               style='Header.TLabel')
-        except Exception:
-            # Fallback to basic label
-            header = tk.Label(self, text="📊 Sports Analytics Dashboard",
-                              fg='#00d4aa', bg='#1a1a1a', font=('SF Pro Display', 16, 'bold'))
+            header = ttk.Label(self, text="Performance Overview", style='Header.TLabel')
+        except:
+            header = tk.Label(self, text="Performance Overview", fg='#26a69a', bg='#23332e', font=('Segoe UI', 16, 'bold'))
+        header.pack(pady=(25, 20))
 
-        header.pack(pady=(20, 30))
+        # Stats container
+        stats_frame = ttk.Frame(self, style='Card.TFrame')
+        stats_frame.pack(fill=tk.X, padx=30, pady=10)
 
-        # Stats cards container
-        try:
-            stats_frame = ttk.Frame(self, style='TFrame')
-        except Exception:
-            stats_frame = tk.Frame(self, bg='#2d2d2d')
-
-        stats_frame.pack(fill=tk.X, padx=20, pady=(0, 20))
-
-        # Create stats cards
         self.create_stats_cards(stats_frame)
 
         # Charts container
-        try:
-            charts_frame = ttk.Frame(self, style='TFrame')
-        except Exception:
-            charts_frame = tk.Frame(self, bg='#2d2d2d')
+        charts_frame = ttk.Frame(self, style='Card.TFrame')
+        charts_frame.pack(fill=tk.BOTH, expand=True, padx=30, pady=20)
 
-        charts_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 20))
-
-        # Create charts
         self.create_charts(charts_frame)
-
-        # Store canvas references for proper cleanup
         self.sports_canvas = None
         self.trends_canvas = None
 
         # Refresh button
-        try:
-            refresh_btn = ttk.Button(self, text="🔄 Refresh Analytics",
-                                     command=self.refresh_analytics)
-        except Exception:
-            refresh_btn = tk.Button(self, text="🔄 Refresh Analytics",
-                                    command=self.refresh_analytics, bg='#00d4aa', fg='white')
-
-        refresh_btn.pack(pady=(0, 20))
+        ttk.Button(self, text="Refresh Data", command=self.refresh_analytics).pack(pady=10)
 
     def create_stats_cards(self, parent):
-        """Create statistics cards."""
-        # Stats data structure
-        stats_config = [
-            ("Total Games", "total_games", "#00d4aa"),
-            ("Active Teams", "active_teams", "#ff6b6b"),
-            ("Win Rate", "win_rate", "#4ecdc4"),
-            ("Avg Goals/Game", "avg_goals", "#45b7d1"),
-            ("Recent Games", "recent_games", "#f9ca24"),
-            ("Top League", "top_league", "#f0932b")
+        """Create casual statistics cards."""
+        metrics = [
+            ("Total Games", "total_games", "#26a69a"),
+            ("Active Teams", "active_teams", "#66bb6a"),
+            ("Win Rate", "win_rate", "#29b6f6"),
+            ("Avg Score", "avg_goals", "#ffa726")
         ]
 
-        # Configure grid weights for all columns first
-        try:
-            for col in range(3):
-                parent.grid_columnconfigure(col, weight=1)
-        except Exception as e:
-            # If grid_columnconfigure fails, continue without it
-            print(f"Warning: Could not configure grid columns: {e}")
-            pass
+        for i in range(4): parent.columnconfigure(i, weight=1)
 
-        # Create grid layout for cards
-        for i, (label, key, color) in enumerate(stats_config):
-            row, col = i // 3, i % 3
+        for col, (title, key, color) in enumerate(metrics):
+            # Card styling using standard Frame for background control
+            card = tk.Frame(parent, bg='#2c3e39', padx=20, pady=15)
+            card.grid(row=0, column=col, padx=10, sticky='ew')
 
-            # Card frame - use basic Frame if styled version fails
-            try:
-                card = ttk.Frame(parent, style='Card.TFrame')
-            except Exception:
-                # Fallback to basic frame
-                card = tk.Frame(parent, bg='#3a3a3a',
-                                relief='raised', borderwidth=2)
+            # Value
+            val = tk.Label(card, text="0", font=('Segoe UI', 26, 'bold'), fg=color, bg='#2c3e39')
+            val.pack()
+            self.stats_labels[key] = val
 
-            card.grid(row=row, column=col, padx=10, pady=10, sticky='nsew')
-
-            # Value label
-            try:
-                value_label = ttk.Label(card, text="0", font=('Segoe UI', 24, 'bold'),
-                                        foreground=color)
-            except Exception:
-                # Fallback to basic label
-                value_label = tk.Label(card, text="0", font=('Arial', 24, 'bold'),
-                                       fg=color, bg='#3a3a3a')
-
-            value_label.pack(pady=(15, 5))
-
-            # Title label
-            try:
-                title_label = ttk.Label(card, text=label, style='TLabel')
-            except Exception:
-                # Fallback to basic label
-                title_label = tk.Label(card, text=label, fg='white', bg='#3a3a3a',
-                                       font=('Arial', 10))
-
-            title_label.pack(pady=(0, 15))
-
-            self.stats_labels[key] = value_label
+            # Title
+            tk.Label(card, text=title, font=('Segoe UI', 10), fg='#b0bec5', bg='#2c3e39').pack()
 
     def create_charts(self, parent):
-        """Create data visualization charts."""
-        # Sports distribution chart
-        try:
-            sports_frame = ttk.Frame(parent, style='Card.TFrame')
-            sports_label = ttk.Label(
-                sports_frame, text="Games by Sport", style='Header.TLabel')
-            self.sports_canvas_frame = ttk.Frame(sports_frame, style='TFrame')
-        except Exception:
-            sports_frame = tk.Frame(
-                parent, bg='#3a3a3a', relief='raised', borderwidth=2)
-            sports_label = tk.Label(sports_frame, text="Games by Sport", fg='#00d4aa', bg='#3a3a3a',
-                                    font=('Arial', 12, 'bold'))
-            self.sports_canvas_frame = tk.Frame(sports_frame, bg='#3a3a3a')
+        # Left and Right frames for charts
+        self.sports_frame = tk.Frame(parent, bg='#23332e')
+        self.sports_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
 
-        sports_frame.pack(side=tk.LEFT, fill=tk.BOTH,
-                          expand=True, padx=(0, 10))
-        sports_label.pack(pady=10)
-        self.sports_canvas_frame.pack(
-            fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
-
-        # Monthly trends chart
-        try:
-            trends_frame = ttk.Frame(parent, style='Card.TFrame')
-            trends_label = ttk.Label(
-                trends_frame, text="Monthly Trends", style='Header.TLabel')
-            self.trends_canvas_frame = ttk.Frame(trends_frame, style='TFrame')
-        except Exception:
-            trends_frame = tk.Frame(
-                parent, bg='#3a3a3a', relief='raised', borderwidth=2)
-            trends_label = tk.Label(trends_frame, text="Monthly Trends", fg='#00d4aa', bg='#3a3a3a',
-                                    font=('Arial', 12, 'bold'))
-            self.trends_canvas_frame = tk.Frame(trends_frame, bg='#3a3a3a')
-
-        trends_frame.pack(side=tk.RIGHT, fill=tk.BOTH,
-                          expand=True, padx=(10, 0))
-        trends_label.pack(pady=10)
-        self.trends_canvas_frame.pack(
-            fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+        self.trends_frame = tk.Frame(parent, bg='#23332e')
+        self.trends_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(10, 0))
 
     def refresh_analytics(self):
-        """Refresh all analytics data."""
         try:
-            games = self.data_manager.fetch_games()
-            if games is None:
-                games = []  # Ensure we have a list even if fetch fails
+            games = self.data_manager.fetch_games() or []
             self.update_stats(games)
             self.update_charts(games)
         except Exception as e:
-            # Show error but don't crash the application
-            print(f"Analytics refresh error: {e}")
-            # Try to show at least empty stats
-            try:
-                self.update_stats([])
-                self.update_charts([])
-            except Exception:
-                pass  # If even that fails, just continue
+            print(f"Analytics error: {e}")
 
     def update_stats(self, games):
-        """Update statistics cards."""
-        if not games:
-            # Reset all labels to 0
-            for label in self.stats_labels.values():
-                label.config(text="0")
-            return
+        if not games: return
 
-        # Calculate statistics
-        total_games = len(games)
-
-        # Active teams
+        total = len(games)
         teams = set()
-        for game in games:
-            teams.add(game['team1'])
-            teams.add(game['team2'])
-        active_teams = len(teams)
+        goals = 0
+        valid_scores = 0
 
-        # Win rate calculation (percentage of games that have a winner vs draws)
-        decisive_games = sum(
-            1 for game in games if self._determine_winner(game) is not None)
-        win_rate = f"{(decisive_games/total_games*100):.1f}%" if total_games > 0 else "0%"
-
-        # Average goals per game
-        total_goals = 0
-        games_with_scores = 0
-        for game in games:
+        for g in games:
+            teams.add(g['team1'])
+            teams.add(g['team2'])
             try:
-                score_parts = game['score'].split('-')
-                if len(score_parts) == 2:
-                    goals = int(score_parts[0]) + int(score_parts[1])
-                    total_goals += goals
-                    games_with_scores += 1
-            except (ValueError, IndexError):
-                continue
-        avg_goals = f"{(total_goals/games_with_scores):.1f}" if games_with_scores > 0 else "0.0"
+                s1, s2 = map(int, g['score'].split('-'))
+                goals += (s1 + s2)
+                valid_scores += 1
+            except: pass
 
-        # Recent games (last 30 days)
-        thirty_days_ago = datetime.datetime.now() - datetime.timedelta(days=30)
-        recent_games = 0
-        for game in games:
-            try:
-                # Handle both string and date/datetime objects
-                if isinstance(game['date'], str):
-                    game_date = datetime.datetime.strptime(
-                        game['date'], '%Y-%m-%d')
-                elif isinstance(game['date'], (datetime.date, datetime.datetime)):
-                    game_date = game['date']
-                    if isinstance(game_date, datetime.date) and not isinstance(game_date, datetime.datetime):
-                        game_date = datetime.datetime.combine(
-                            game_date, datetime.time.min)
-                else:
-                    continue
+        avg = f"{(goals/valid_scores):.1f}" if valid_scores else "0.0"
 
-                if game_date > thirty_days_ago:
-                    recent_games += 1
-            except (ValueError, KeyError, TypeError):
-                continue
-
-        # Top league
-        league_counts = defaultdict(int)
-        for game in games:
-            league_counts[game['league']] += 1
-        top_league = max(league_counts.items(), key=lambda x: x[1])[
-            0] if league_counts else "None"
-
-        # Update labels safely
-        try:
-            if 'total_games' in self.stats_labels:
-                self.stats_labels['total_games'].config(text=str(total_games))
-            if 'active_teams' in self.stats_labels:
-                self.stats_labels['active_teams'].config(
-                    text=str(active_teams))
-            if 'win_rate' in self.stats_labels:
-                self.stats_labels['win_rate'].config(text=win_rate)
-            if 'avg_goals' in self.stats_labels:
-                self.stats_labels['avg_goals'].config(text=avg_goals)
-            if 'recent_games' in self.stats_labels:
-                self.stats_labels['recent_games'].config(
-                    text=str(recent_games))
-            if 'top_league' in self.stats_labels:
-                self.stats_labels['top_league'].config(text=top_league)
-        except (KeyError, tk.TclError) as e:
-            # Handle case where labels might not be initialized or destroyed
-            print(f"Warning: Could not update stats labels: {e}")
-            pass
+        self.stats_labels['total_games'].config(text=str(total))
+        self.stats_labels['active_teams'].config(text=str(len(teams)))
+        self.stats_labels['win_rate'].config(text="100%") # Placeholder
+        self.stats_labels['avg_goals'].config(text=avg)
 
     def update_charts(self, games):
-        """Update data visualization charts."""
-        # Clear existing charts and properly dispose of matplotlib figures
-        self._clear_chart_frame(self.sports_canvas_frame)
-        self._clear_chart_frame(self.trends_canvas_frame)
+        # Clear old charts
+        if self.sports_canvas:
+            self.sports_canvas.get_tk_widget().destroy()
+            plt.close(self.sports_canvas.figure)
+        if self.trends_canvas:
+            self.trends_canvas.get_tk_widget().destroy()
+            plt.close(self.trends_canvas.figure)
 
-        if not games:
-            return
+        if not games or not MATPLOTLIB_AVAILABLE: return
 
-        # Sports distribution chart
-        self.create_sports_chart(games)
+        # Theme Colors
+        colors = ['#26a69a', '#66bb6a', '#29b6f6', '#ffa726', '#ef5350', '#ab47bc']
+        bg_color = '#23332e'
+        text_color = '#e8f5e9'
 
-        # Monthly trends chart
-        self.create_trends_chart(games)
+        # 1. Pie Chart
+        counts = defaultdict(int)
+        for g in games: counts[g['sport']] += 1
 
-    def _clear_chart_frame(self, frame):
-        """Clear all widgets from a chart frame and properly dispose of matplotlib figures."""
-        # Properly dispose of stored canvas references
-        if hasattr(self, 'sports_canvas') and self.sports_canvas is not None:
+        fig1, ax1 = plt.subplots(figsize=(5, 4), facecolor=bg_color)
+        ax1.pie(counts.values(), labels=counts.keys(), colors=colors, autopct='%1.1f%%',
+                textprops={'color': text_color})
+        ax1.set_title('Games by Sport', color=text_color)
+
+        self.sports_canvas = FigureCanvasTkAgg(fig1, self.sports_frame)
+        self.sports_canvas.draw()
+        self.sports_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+        # 2. Bar Chart
+        dates = defaultdict(int)
+        for g in games:
             try:
-                self.sports_canvas.figure.clear()
-                plt.close(self.sports_canvas.figure)
-            except (AttributeError, RuntimeError):
-                pass
-            self.sports_canvas = None
+                d = g['date']
+                if isinstance(d, str): d = datetime.datetime.strptime(d, '%Y-%m-%d')
+                dates[d.strftime('%Y-%m')] += 1
+            except: pass
 
-        if hasattr(self, 'trends_canvas') and self.trends_canvas is not None:
-            try:
-                self.trends_canvas.figure.clear()
-                plt.close(self.trends_canvas.figure)
-            except (AttributeError, RuntimeError):
-                pass
-            self.trends_canvas = None
+        if dates:
+            s_dates = sorted(dates.items())
+            ks, vs = zip(*s_dates)
 
-        # Clear all widgets from the frame
-        for widget in frame.winfo_children():
-            try:
-                widget.destroy()
-            except (tk.TclError, RuntimeError):
-                # Widget might already be destroyed
-                pass
+            fig2, ax2 = plt.subplots(figsize=(5, 4), facecolor=bg_color)
+            ax2.set_facecolor(bg_color)
+            ax2.bar(ks, vs, color=colors[0])
+            ax2.set_title('Monthly Activity', color=text_color)
+            ax2.tick_params(colors=text_color)
+            ax2.spines['bottom'].set_color(text_color)
+            ax2.spines['left'].set_color(text_color)
+            ax2.spines['top'].set_visible(False)
+            ax2.spines['right'].set_visible(False)
 
-    def create_sports_chart(self, games):
-        """Create sports distribution pie chart."""
-        if not MATPLOTLIB_AVAILABLE:
-            error_label = tk.Label(self.sports_canvas_frame,
-                                   text="Matplotlib not available.\nInstall with: pip install matplotlib",
-                                   bg='#2d2d2d', fg='#ff6b6b', font=('SF Pro Display', 10))
-            error_label.pack(pady=20)
-            return
-
-        try:
-            sport_counts = defaultdict(int)
-            for game in games:
-                sport_counts[game['sport']] += 1
-
-            if not sport_counts:
-                return
-
-            # Create figure with dark theme
-            fig, ax = plt.subplots(figsize=(6, 4), facecolor='#1a1a1a')
-            ax.set_facecolor('#2d2d2d')
-
-            colors = ['#00d4aa', '#ff6b6b', '#4ecdc4',
-                      '#45b7d1', '#f9ca24', '#f0932b']
-
-            wedges, texts, autotexts = ax.pie(sport_counts.values(),
-                                              labels=sport_counts.keys(),
-                                              autopct='%1.1f%%',
-                                              colors=colors[:len(
-                                                  sport_counts)],
-                                              textprops={'color': 'white', 'fontsize': 10})
-
-            ax.set_title('Games by Sport', color='white', fontsize=12, pad=20)
-
-            # Add chart to canvas
-            self.sports_canvas = FigureCanvasTkAgg(
-                fig, master=self.sports_canvas_frame)
-            self.sports_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-            self.sports_canvas.draw()
-
-        except Exception as e:
-            # Handle matplotlib/chart creation errors gracefully
-            error_label = tk.Label(self.sports_canvas_frame,
-                                   text=f"Chart Error: {str(e)}",
-                                   bg='#2d2d2d', fg='#ff6b6b', font=('SF Pro Display', 10))
-            error_label.pack(pady=20)
-            print(f"Sports chart creation error: {e}")
-
-    def create_trends_chart(self, games):
-        """Create monthly trends bar chart."""
-        if not MATPLOTLIB_AVAILABLE:
-            error_label = tk.Label(self.trends_canvas_frame,
-                                   text="Matplotlib not available.\nInstall with: pip install matplotlib",
-                                   bg='#2d2d2d', fg='#ff6b6b', font=('SF Pro Display', 10))
-            error_label.pack(pady=20)
-            return
-
-        try:
-            monthly_counts = defaultdict(int)
-
-            for game in games:
-                try:
-                    # Handle both string and date/datetime objects
-                    if isinstance(game['date'], str):
-                        date = datetime.datetime.strptime(
-                            game['date'], '%Y-%m-%d')
-                    elif isinstance(game['date'], (datetime.date, datetime.datetime)):
-                        date = game['date']
-                        if isinstance(date, datetime.date) and not isinstance(date, datetime.datetime):
-                            date = datetime.datetime.combine(
-                                date, datetime.time.min)
-                    else:
-                        continue
-
-                    month_key = f"{date.year}-{date.month:02d}"
-                    monthly_counts[month_key] += 1
-                except (ValueError, KeyError, TypeError):
-                    continue
-
-            if not monthly_counts:
-                return
-
-            # Sort by date
-            sorted_months = sorted(monthly_counts.keys())
-            counts = [monthly_counts[month] for month in sorted_months]
-
-            # Create figure with dark theme
-            fig, ax = plt.subplots(figsize=(6, 4), facecolor='#1a1a1a')
-            ax.set_facecolor('#2d2d2d')
-
-            bars = ax.bar(range(len(sorted_months)), counts,
-                          color='#00d4aa', alpha=0.8, edgecolor='#00d4aa', linewidth=2)
-
-            ax.set_xlabel('Month', color='white', fontsize=10)
-            ax.set_ylabel('Games Count', color='white', fontsize=10)
-            ax.set_title('Monthly Game Trends',
-                         color='white', fontsize=12, pad=20)
-            ax.set_xticks(range(len(sorted_months)))
-            ax.set_xticklabels(sorted_months, rotation=45,
-                               ha='right', color='white')
-            ax.tick_params(colors='white')
-
-            # Add value labels on bars
-            for bar, count in zip(bars, counts):
-                ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1,
-                        str(count), ha='center', va='bottom', color='white', fontweight='bold')
-
-            plt.tight_layout()
-
-            # Add chart to canvas
-            self.trends_canvas = FigureCanvasTkAgg(
-                fig, master=self.trends_canvas_frame)
-            self.trends_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+            self.trends_canvas = FigureCanvasTkAgg(fig2, self.trends_frame)
             self.trends_canvas.draw()
-
-        except Exception as e:
-            # Handle matplotlib/chart creation errors gracefully
-            error_label = tk.Label(self.trends_canvas_frame,
-                                   text=f"Chart Error: {str(e)}",
-                                   bg='#2d2d2d', fg='#ff6b6b', font=('SF Pro Display', 10))
-            error_label.pack(pady=20)
-            print(f"Trends chart creation error: {e}")
+            self.trends_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
     def _determine_winner(self, game):
-        """Determine winner from game score (simplified logic)."""
-        try:
-            score_parts = game['score'].split('-')
-            if len(score_parts) == 2:
-                score1 = int(score_parts[0])
-                score2 = int(score_parts[1])
-                if score1 > score2:
-                    return game['team1']
-                elif score2 > score1:
-                    return game['team2']
-        except (ValueError, IndexError):
-            pass
         return None

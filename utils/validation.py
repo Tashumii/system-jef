@@ -5,7 +5,7 @@ Handles all types of validation: form data, business logic, data integrity.
 
 import re
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 
 
@@ -30,80 +30,45 @@ class ValidationError(Exception):
 class SportsDataValidator:
     """
     Sports Data Validation Engine.
-
-    Provides comprehensive validation for all sports-related data including:
-    - Game data integrity and business rules
-    - Team name validation and uniqueness
-    - Score format validation by sport
-    - League-sport compatibility checks
-    - Date range and format validation
     """
 
-    # League-sport mappings for validation
+    # Enhanced mappings for new sports
     LEAGUE_SPORT_MAPPING = {
-        "Premier League": "Soccer",
-        "La Liga": "Soccer",
-        "Serie A": "Soccer",
-        "Bundesliga": "Soccer",
-        "Champions League": "Soccer",
-        "Europa League": "Soccer",
-        "NBA": "Basketball",
-        "EuroLeague": "Basketball",
+        # Soccer
+        "Premier League": "Soccer", "La Liga": "Soccer", "Serie A": "Soccer",
+        "Bundesliga": "Soccer", "Champions League": "Soccer", "Europa League": "Soccer",
+        # Basketball
+        "NBA": "Basketball", "EuroLeague": "Basketball", "WNBA": "Basketball",
         "College Basketball": "Basketball",
-        "WNBA": "Basketball"
-    }
-
-    # Team name patterns for different sports
-    TEAM_NAME_PATTERNS = {
-        "Soccer": r"^[A-Za-z\s\-\.\'&À-ÿ]{2,50}$",
-        "Basketball": r"^[A-Za-z\s\-\.\d'&À-ÿ]{2,50}$"
-    }
-
-    # League name validation pattern
-    LEAGUE_NAME_PATTERN = r"^[A-Za-z\s\-\.\d'&À-ÿ]{2,100}$"
-
-    # Score patterns for different sports
-    SCORE_PATTERNS = {
-        "Soccer": r"^\d{1,2}-\d{1,2}$",
-        "Basketball": r"^\d{2,3}-\d{2,3}$"
+        # F1
+        "F1 World Championship": "Formula 1", "Monaco Grand Prix": "Formula 1",
+        "British Grand Prix": "Formula 1", "Italian Grand Prix": "Formula 1",
+        # Billiards
+        "World Pool Championship": "Billiards", "Mosconi Cup": "Billiards",
+        "US Open Pool Championship": "Billiards"
     }
 
     @staticmethod
-    def validate_team_name(team_name: str, sport: str) -> ValidationResult:
+    def validate_team_name(name: str, sport: str) -> ValidationResult:
         """
-        Validate team name format and length for a specific sport.
-
-        Args:
-            team_name: Name of the team to validate
-            sport: Sport type (Soccer, Basketball, etc.)
-
-        Returns:
-            ValidationResult indicating if team name is valid
+        Validate participant name (Team, Driver, or Player).
         """
-        """Validate team name format and length."""
-        if not team_name or not team_name.strip():
-            return ValidationResult(False, "Team name cannot be empty", "team_name")
+        if not name or not name.strip():
+            return ValidationResult(False, "Participant name cannot be empty", "team_name")
 
-        team_name = team_name.strip()
+        name = name.strip()
 
-        if len(team_name) < 2:
-            return ValidationResult(False, "Team name must be at least 2 characters", "team_name")
+        if len(name) < 2:
+            return ValidationResult(False, "Name must be at least 2 characters", "team_name")
 
-        if len(team_name) > 50:
-            return ValidationResult(False, "Team name cannot exceed 50 characters", "team_name")
+        if len(name) > 50:
+            return ValidationResult(False, "Name cannot exceed 50 characters", "team_name")
 
-        # Check for pattern if sport is specified
-        if sport in SportsDataValidator.TEAM_NAME_PATTERNS:
-            pattern = SportsDataValidator.TEAM_NAME_PATTERNS[sport]
-            if not re.match(pattern, team_name):
-                return ValidationResult(False,
-                                        f"Team name contains invalid characters for {sport}", "team_name")
+        # Check for dangerous characters (SQL injection / XSS prevention basics)
+        if any(char in name for char in ['<', '>', ';', '{', '}']):
+            return ValidationResult(False, "Name contains invalid characters", "team_name")
 
-        # Check for potentially problematic characters
-        if any(char in team_name for char in ['<', '>', '"', "'", ';', '--']):
-            return ValidationResult(False, "Team name contains invalid characters", "team_name")
-
-        return ValidationResult(True, "Team name is valid")
+        return ValidationResult(True, "Valid")
 
     @staticmethod
     def validate_league_name(league_name: str) -> ValidationResult:
@@ -119,239 +84,145 @@ class SportsDataValidator:
         if len(league_name) > 100:
             return ValidationResult(False, "League name cannot exceed 100 characters", "league")
 
-        if not re.match(SportsDataValidator.LEAGUE_NAME_PATTERN, league_name):
-            return ValidationResult(False, "League name contains invalid characters", "league")
-
-        return ValidationResult(True, "League name is valid")
+        return ValidationResult(True, "Valid")
 
     @staticmethod
     def validate_date(date_str: str) -> ValidationResult:
-        """Validate date format and range."""
+        """Validate date format (YYYY-MM-DD)."""
         if not date_str or not date_str.strip():
             return ValidationResult(False, "Date cannot be empty", "date")
 
         try:
             date_obj = datetime.strptime(date_str.strip(), '%Y-%m-%d')
         except ValueError:
-            return ValidationResult(False, "Invalid date format. Use YYYY-MM-DD", "date")
+            return ValidationResult(False, "Invalid format. Use YYYY-MM-DD", "date")
 
         now = datetime.now()
-        min_date = now - timedelta(days=365*10)  # 10 years ago
-        max_date = now + timedelta(days=365)     # 1 year in future
+        min_date = now - timedelta(days=365*20)  # 20 years ago
+        max_date = now + timedelta(days=365*2)   # 2 years in future
 
         if date_obj < min_date:
-            return ValidationResult(False, "Date cannot be more than 10 years ago", "date")
+            return ValidationResult(False, "Date cannot be more than 20 years ago", "date")
 
         if date_obj > max_date:
-            return ValidationResult(False, "Date cannot be more than 1 year in the future", "date")
+            return ValidationResult(False, "Date cannot be more than 2 years in the future", "date")
 
-        # Warn about future dates
         if date_obj > now:
-            return ValidationResult(True, "Future date detected", "date", "warning")
+            return ValidationResult(True, "Future date detected (Scheduled Game)", "date", "info")
 
-        return ValidationResult(True, "Date is valid")
+        return ValidationResult(True, "Valid")
 
     @staticmethod
     def validate_score(score_str: str, sport: str) -> ValidationResult:
-        """Validate score format and ranges."""
+        """
+        Validate score format and ranges based on the sport.
+        Format expected: X-Y
+        """
         if not score_str or not score_str.strip():
             return ValidationResult(False, "Score cannot be empty", "score")
 
-        score_str = score_str.strip()
-
-        # Check format pattern
-        if sport in SportsDataValidator.SCORE_PATTERNS:
-            pattern = SportsDataValidator.SCORE_PATTERNS[sport]
-            if not re.match(pattern, score_str):
-                return ValidationResult(False,
-                                        f"Invalid score format for {sport}. Use format: X-Y", "score")
-
-        # Parse scores
         try:
             parts = score_str.split('-')
             if len(parts) != 2:
-                return ValidationResult(False, "Score must be in format X-Y", "score")
+                return ValidationResult(False, "Score must be format 'X-Y' (e.g. 2-1)", "score")
 
-            score1 = int(parts[0].strip())
-            score2 = int(parts[1].strip())
+            s1 = int(parts[0].strip())
+            s2 = int(parts[1].strip())
 
-            if score1 < 0 or score2 < 0:
+            if s1 < 0 or s2 < 0:
                 return ValidationResult(False, "Scores cannot be negative", "score")
 
-        except (ValueError, IndexError):
-            return ValidationResult(False, "Invalid score format. Use numbers only", "score")
+            # --- Smart Sport Heuristics ---
 
-        # Sport-specific validation
-        if sport == "Soccer":
-            if score1 > 15 or score2 > 15:
-                return ValidationResult(False, "Soccer scores rarely exceed 15 goals", "score", "warning")
-            elif score1 > 10 or score2 > 10:
-                return ValidationResult(True, "High scoring game detected", "score", "info")
+            if sport == "Soccer":
+                if s1 > 30 or s2 > 30:
+                    return ValidationResult(True, "Unusually high score for Soccer", "score", "warning")
 
-        elif sport == "Basketball":
-            if score1 < 50 or score2 < 50:
-                return ValidationResult(False, "Basketball scores are typically above 50", "score")
-            elif score1 > 200 or score2 > 200:
-                return ValidationResult(False, "Basketball scores rarely exceed 200 points", "score", "warning")
+            elif sport == "Basketball":
+                # Basketball scores are rarely single digits unless it's very early/forfeit
+                if (s1 < 30 or s2 < 30) and (s1 + s2 > 0):
+                    return ValidationResult(True, "Unusually low score for Basketball", "score", "warning")
 
-        return ValidationResult(True, "Score is valid")
+            elif sport == "Formula 1":
+                # F1 'scores' in this app are finishing positions (1st vs 2nd)
+                if s1 > 25 or s2 > 25:
+                    return ValidationResult(True, "F1 positions are typically 1-20", "score", "info")
+                if s1 == s2:
+                    return ValidationResult(True, "Drivers rarely finish in exact same position", "score", "warning")
+
+            elif sport == "Billiards":
+                if s1 > 50 or s2 > 50:
+                    return ValidationResult(True, "High rack count for Billiards", "score", "info")
+
+            return ValidationResult(True, "Valid")
+
+        except ValueError:
+            return ValidationResult(False, "Score must contain only numbers", "score")
 
     @staticmethod
     def validate_league_sport_compatibility(league: str, sport: str) -> ValidationResult:
-        """Validate that league is appropriate for the sport."""
+        """Warn if a league doesn't match the selected sport."""
         expected_sport = SportsDataValidator.LEAGUE_SPORT_MAPPING.get(league)
 
         if expected_sport and expected_sport != sport:
-            return ValidationResult(False,
-                                    f"'{league}' is typically a {expected_sport} league, not {sport}", "league", "warning")
+            return ValidationResult(
+                True,
+                f"'{league}' is typically a {expected_sport} league, not {sport}",
+                "league",
+                "warning"
+            )
 
-        return ValidationResult(True, "League-sport combination is valid")
-
-    @staticmethod
-    def validate_unique_game(team1: str, team2: str, league: str, date: str,
-                             existing_games: List[Dict[str, Any]], exclude_id: Optional[int] = None) -> ValidationResult:
-        """Check for duplicate games."""
-        for game in existing_games:
-            if exclude_id and game.get('id') == exclude_id:
-                continue
-
-            # Check if same teams, league, and date
-            if (game['team1'] == team1 and game['team2'] == team2 and
-                    game['league'] == league and game['date'] == date):
-                return ValidationResult(False,
-                                        "A game between these teams in this league already exists on this date", "general")
-
-            # Check reverse team order
-            if (game['team1'] == team2 and game['team2'] == team1 and
-                    game['league'] == league and game['date'] == date):
-                return ValidationResult(False,
-                                        "A game between these teams in this league already exists on this date", "general")
-
-        return ValidationResult(True, "Game is unique")
+        return ValidationResult(True, "Valid")
 
     @staticmethod
-    def validate_game_data(game_data: Dict[str, Any], existing_games: Optional[List[Dict[str, Any]]] = None,
-                           exclude_game_id: Optional[int] = None) -> List[ValidationResult]:
+    def validate_game_data(game_data: Dict[str, Any], existing_games: Optional[List[Dict[str, Any]]] = None) -> List[ValidationResult]:
         """
-        Perform comprehensive validation on game data.
-
-        Validates all aspects of game data including format, business rules,
-        uniqueness constraints, and data integrity.
-
-        Args:
-            game_data: Dictionary containing game information
-            existing_games: List of existing games for uniqueness checks
-            exclude_game_id: Game ID to exclude from duplicate checks (for updates)
-
-        Returns:
-            List of ValidationResult objects with all validation issues
+        Perform comprehensive validation on the entire game object.
         """
         results = []
 
-        # Required fields
-        required_fields = ['sport', 'league',
-                           'team1', 'team2', 'score', 'date']
-        for field in required_fields:
-            if field not in game_data or not game_data[field]:
+        # Extract fields
+        sport = game_data.get('sport', '')
+        league = game_data.get('league', '')
+        team1 = game_data.get('team1', '')
+        team2 = game_data.get('team2', '')
+        score = game_data.get('score', '')
+        date = game_data.get('date', '')
+
+        # 1. Required Check
+        for field in ['sport', 'league', 'team1', 'team2', 'score', 'date']:
+            if not game_data.get(field):
                 results.append(ValidationResult(
-                    False, f"{field} is required", field))
+                    False, f"{field.title()} is required", field))
 
-        if not all(field in game_data and game_data[field] for field in required_fields):
-            return results  # Don't continue if required fields are missing
+        # Return early if missing data to avoid crash in detailed checks
+        if any(not r.is_valid for r in results):
+            return results
 
-        # Individual field validations
-        sport = game_data['sport']
-        league = game_data['league']
-        team1 = game_data['team1']
-        team2 = game_data['team2']
-        score = game_data['score']
-        date = game_data['date']
-
-        # Team validations
+        # 2. Individual Field Validations
         results.append(SportsDataValidator.validate_team_name(team1, sport))
         results.append(SportsDataValidator.validate_team_name(team2, sport))
+        results.append(SportsDataValidator.validate_league_name(league))
+        results.append(SportsDataValidator.validate_date(date))
+        results.append(SportsDataValidator.validate_score(score, sport))
 
-        # Same team check
+        # 3. Logical Checks
         if team1.strip().lower() == team2.strip().lower():
             results.append(ValidationResult(
-                False, "Team 1 and Team 2 cannot be the same", "team2"))
+                False, "Participant 1 and 2 cannot be the same", "team2"))
 
-        # League validation
-        results.append(SportsDataValidator.validate_league_name(league))
-
-        # League-sport compatibility
+        # 4. Business Logic Warnings
         results.append(
             SportsDataValidator.validate_league_sport_compatibility(league, sport))
 
-        # Score validation
-        results.append(SportsDataValidator.validate_score(score, sport))
-
-        # Date validation
-        results.append(SportsDataValidator.validate_date(date))
-
-        # Uniqueness check
-        if existing_games is not None:
-            results.append(SportsDataValidator.validate_unique_game(
-                team1, team2, league, date, existing_games, exclude_id))
+        # 5. Duplicate Check
+        if existing_games:
+            for game in existing_games:
+                # Check for exact duplicate match
+                if (game['team1'] == team1 and game['team2'] == team2 and
+                        game['league'] == league and game['date'] == date):
+                    results.append(ValidationResult(
+                        False, "This match record already exists", "general"))
+                    break
 
         return results
-
-    @staticmethod
-    def validate_batch_games(games_data: List[Dict[str, Any]]) -> Tuple[List[ValidationResult], int]:
-        """Validate a batch of games, checking for duplicates within the batch."""
-        results = []
-        valid_count = 0
-
-        # First, validate each game individually
-        for i, game_data in enumerate(games_data):
-            game_results = SportsDataValidator.validate_game_data(game_data)
-            for result in game_results:
-                if not result.is_valid and result.severity == "error":
-                    # Add game index to field name for batch context
-                    field_name = f"game_{i+1}.{result.field}" if result.field != "general" else f"game_{i+1}"
-                    results.append(ValidationResult(
-                        result.is_valid, result.message, field_name, result.severity))
-                else:
-                    results.append(result)
-
-            # Count valid games
-            error_count = sum(
-                1 for r in game_results if not r.is_valid and r.severity == "error")
-            if error_count == 0:
-                valid_count += 1
-
-        # Check for duplicates within the batch
-        for i, game1 in enumerate(games_data):
-            for j, game2 in enumerate(games_data[i+1:], i+1):
-                if (game1.get('team1') == game2.get('team1') and
-                    game1.get('team2') == game2.get('team2') and
-                    game1.get('league') == game2.get('league') and
-                        game1.get('date') == game2.get('date')):
-                    results.append(ValidationResult(False,
-                                                    f"Duplicate games found between games {i+1} and {j+1}", f"game_{i+1}"))
-                    valid_count -= 1
-
-        return results, valid_count
-
-    @staticmethod
-    def get_validation_summary(results: List[ValidationResult]) -> Dict[str, int]:
-        """Get summary of validation results."""
-        summary = {
-            'total': len(results),
-            'errors': 0,
-            'warnings': 0,
-            'info': 0,
-            'valid': 0
-        }
-
-        for result in results:
-            if result.is_valid:
-                summary['valid'] += 1
-            elif result.severity == 'error':
-                summary['errors'] += 1
-            elif result.severity == 'warning':
-                summary['warnings'] += 1
-            elif result.severity == 'info':
-                summary['info'] += 1
-
-        return summary
