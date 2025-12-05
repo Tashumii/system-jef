@@ -1,36 +1,31 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-
 from database.interfaces import IDataManager
 from config.settings import APP_CONFIG
-from ui.game_list import GameList  # make sure this is the cleaned version
 
 
 class MainApplication(tk.Tk):
     """
     Midnight Teal Themed Sidebar Application
-    Fully fixed version with .run() method
+    Supports dynamic view switching.
     """
 
     def __init__(self, data_manager: IDataManager):
         super().__init__()
-
         self.data_manager = data_manager
+        self.current_user = None
         self.current_view = None
-        self.current_user = {"username": "Admin"}  # temporary
 
-        self.withdraw()  # Hide flashing
         self._setup_window()
         self._setup_styles()
         self._build_layout()
         self._build_sidebar()
 
+        # Show default view
         self.show_view("dashboard")
 
-        self.deiconify()  # Show app without flicker
-
     # -------------------------
-    # WINDOW + THEME SETUP
+    # WINDOW & THEME
     # -------------------------
     def _setup_window(self):
         self.title(APP_CONFIG.get("title", "Sports Management Dashboard"))
@@ -40,18 +35,13 @@ class MainApplication(tk.Tk):
     def _setup_styles(self):
         style = ttk.Style()
         style.theme_use("clam")
-
-        bg = "#1e1e1e"
-        fg = "#ffffff"
         accent = "#00acc1"
 
-        style.configure("TFrame", background=bg)
-        style.configure("TLabel", background=bg, foreground=fg)
-        style.configure("Header.TLabel",
-                        font=("Segoe UI", 24, "bold"),
-                        foreground=accent)
+        style.configure("TFrame", background="#1e1e1e")
+        style.configure("TLabel", background="#1e1e1e", foreground="white")
+        style.configure("Header.TLabel", font=(
+            "Segoe UI", 24, "bold"), foreground=accent)
 
-        # Treeview table styling
         style.configure("Treeview",
                         background="#2d2d2d",
                         fieldbackground="#2d2d2d",
@@ -67,12 +57,10 @@ class MainApplication(tk.Tk):
     # LAYOUT
     # -------------------------
     def _build_layout(self):
-        # Sidebar (left)
         self.sidebar = tk.Frame(self, bg="#252526", width=250)
         self.sidebar.pack(side=tk.LEFT, fill=tk.Y)
         self.sidebar.pack_propagate(False)
 
-        # Main content (right)
         self.content_area = tk.Frame(self, bg="#1e1e1e")
         self.content_area.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
@@ -89,16 +77,6 @@ class MainApplication(tk.Tk):
         self._add_nav_button("📝  New Entry", "entry")
         self._add_nav_button("📁  Records", "records")
         self._add_nav_button("⚔️  Head-to-Head", "h2h")
-
-        tk.Button(
-            self.sidebar,
-            text="⚙ Settings",
-            bg="#252526",
-            fg="#aaaaaa",
-            bd=0,
-            cursor="hand2",
-            activebackground="#252526"
-        ).pack(side=tk.BOTTOM, pady=20)
 
     def _add_nav_button(self, text: str, target: str):
         btn = tk.Button(
@@ -119,11 +97,9 @@ class MainApplication(tk.Tk):
         btn.pack(fill=tk.X)
 
     # -------------------------
-    # VIEW SWITCHING SYSTEM
+    # VIEW SWITCHING
     # -------------------------
     def show_view(self, view_name: str):
-        """Safely load any view while preventing crashes."""
-        # Clear existing view
         for widget in self.content_area.winfo_children():
             widget.destroy()
 
@@ -135,19 +111,15 @@ class MainApplication(tk.Tk):
             elif view_name == "records":
                 from ui.game_list import GameList
                 view = GameList(self.content_area, self.data_manager)
-                view.refresh_games()  # ensure latest games are fetched
+                view.refresh_games()
 
             elif view_name == "entry":
                 from ui.game_form import GameForm
-                # Pass GameList instance to GameForm for auto-refresh
                 from ui.game_list import GameList
                 records_view = GameList(self.content_area, self.data_manager)
                 records_view.refresh_games()
-                view = GameForm(
-                    self.content_area,
-                    self.data_manager,
-                    game_list=records_view  # ✅ pass the instance
-                )
+                view = GameForm(self.content_area,
+                                self.data_manager, game_list=records_view)
 
             elif view_name == "h2h":
                 from ui.head_to_head import HeadToHeadView
@@ -157,17 +129,16 @@ class MainApplication(tk.Tk):
                 raise Exception(f"Unknown view: {view_name}")
 
             view.pack(fill=tk.BOTH, expand=True, padx=30, pady=30)
-            self.current_view = view  # track current view
+            self.current_view = view
 
         except Exception as e:
             messagebox.showerror(
                 "View Load Error", f"Failed to load view '{view_name}':\n\n{str(e)}")
-    # -------------------------
-    # ADD RUN() METHOD
-    # -------------------------
 
+    # -------------------------
+    # RUN METHOD
+    # -------------------------
     def run(self):
-        """Start Tkinter main loop safely."""
         try:
             self.mainloop()
         except Exception as e:

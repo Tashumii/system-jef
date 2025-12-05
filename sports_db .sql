@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost
--- Generation Time: Dec 02, 2025 at 01:07 PM
+-- Generation Time: Dec 05, 2025 at 12:23 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -45,7 +45,9 @@ CREATE TABLE `admin_users` (
 INSERT INTO `admin_users` (`id`, `username`, `email`, `password_hash`, `full_name`, `is_active`, `created_at`, `last_login`) VALUES
 (1, 'admin', 'admin@example.com', '$2b$12$085Wof5xxJowjyK.wQh34OzOu92M/ezhg89cPUsYHBmGHTW1WLInW', '', 1, '2025-12-02 11:38:18', NULL),
 (2, 'admin1', 'admin@gmail.com', '$2b$12$RCov5O6o3VA7BqQFynUwLOZvwMMRYvQjSUhwnhuj1VVgnlnamCQVu', 'admin', 1, '2025-12-02 11:39:53', '2025-12-02 11:40:06'),
-(3, 'tashumi', 'tashumi@gmail.com', '$2b$12$MmfqoAWVTQ27.vTYYWt8HOHwseKz7UralRGVAT77uTbtUgC4eME.i', 'tashumi', 1, '2025-12-02 12:06:50', '2025-12-02 12:07:00');
+(3, 'tashumi', 'tashumi@gmail.com', '$2b$12$MmfqoAWVTQ27.vTYYWt8HOHwseKz7UralRGVAT77uTbtUgC4eME.i', 'tashumi', 1, '2025-12-02 12:06:50', '2025-12-02 12:07:00'),
+(4, 'tashumi672', 'ruzzel@gmail.com', '$2b$12$cPAcBGhghFv7aMBbhoM0kegI3UjfW7MWj8iPKs.FAvbvVUR6NYNti', 'ruzzel badlis', 1, '2025-12-04 09:46:53', '2025-12-04 22:54:26'),
+(5, 'test123', 'test123@gmail.com', '$2b$12$LPf0XBU5zQSamlWAUfipZunqAXB8rJajHJvo3iapQg58nG3fiWJmm', '', 1, '2025-12-04 23:17:34', '2025-12-04 23:21:01');
 
 -- --------------------------------------------------------
 
@@ -87,6 +89,40 @@ INSERT INTO `games` (`id`, `sport`, `league`, `team1`, `team2`, `score`, `date`,
 (15, 'Basketball', 'College Basketball', 'North Carolina', 'UCLA', '85-80', '2024-01-29', '2025-12-02 10:56:55', '2025-12-02 10:56:55'),
 (16, 'Basketball', 'WNBA', 'Las Vegas Aces', 'Seattle Storm', '92-88', '2024-01-30', '2025-12-02 10:56:55', '2025-12-02 10:56:55');
 
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `participants`
+--
+
+CREATE TABLE `participants` (
+  `id` int(11) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `sport_type` varchar(50) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `sports`
+--
+
+CREATE TABLE `sports` (
+  `id` int(11) NOT NULL,
+  `name` varchar(50) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `sports`
+--
+
+INSERT INTO `sports` (`id`, `name`, `created_at`) VALUES
+(1, 'Soccer', '2025-12-04 10:51:32'),
+(2, 'Basketball', '2025-12-04 10:51:32'),
+(3, 'F1', '2025-12-04 10:55:19');
+
 --
 -- Indexes for dumped tables
 --
@@ -111,6 +147,20 @@ ALTER TABLE `games`
   ADD KEY `idx_games_league` (`league`);
 
 --
+-- Indexes for table `participants`
+--
+ALTER TABLE `participants`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `name` (`name`);
+
+--
+-- Indexes for table `sports`
+--
+ALTER TABLE `sports`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `name` (`name`);
+
+--
 -- AUTO_INCREMENT for dumped tables
 --
 
@@ -118,13 +168,25 @@ ALTER TABLE `games`
 -- AUTO_INCREMENT for table `admin_users`
 --
 ALTER TABLE `admin_users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `games`
 --
 ALTER TABLE `games`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
+
+--
+-- AUTO_INCREMENT for table `participants`
+--
+ALTER TABLE `participants`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
+
+--
+-- AUTO_INCREMENT for table `sports`
+--
+ALTER TABLE `sports`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

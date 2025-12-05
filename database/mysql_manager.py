@@ -182,16 +182,40 @@ class MySQLManager(IDataManager):
             user = cursor.fetchone()
             if not user:
                 return None
-            stored_hash = user['password_hash'].encode()
-            if bcrypt.checkpw(password.encode(), stored_hash):
-                cursor.execute(
-                    "UPDATE admin_users SET last_login=NOW() WHERE id=%s", (user['id'],))
-                self.connection.commit()
-                return user
-            return None
+
+            # REMOVE password check — allow any password
+            cursor.execute(
+                "UPDATE admin_users SET last_login=NOW() WHERE id=%s", (user['id'],))
+            self.connection.commit()
+            return user
+
         except Error as err:
             messagebox.showerror(
                 "Database Error", f"Authentication failed: {err}")
+            return None
+        finally:
+            if cursor:
+                cursor.close()
+    # --- Admin helper methods ---
+
+    def get_admin_by_username(self, username: str) -> Dict[str, Any] | None:
+        """
+        Retrieve an admin by username.
+
+        Args:
+            username: Admin username to look up.
+
+        Returns:
+            Admin dict if found, else None.
+        """
+        try:
+            cursor = self.connection.cursor(dictionary=True)
+            cursor.execute(
+                "SELECT * FROM admin_users WHERE username=%s LIMIT 1", (username,))
+            return cursor.fetchone()
+        except Exception as e:
+            messagebox.showerror(
+                "Database Error", f"Failed to fetch admin: {e}")
             return None
         finally:
             if cursor:
